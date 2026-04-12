@@ -9,4 +9,4 @@ urlpatterns = [
     path('api/facturas/', FacturaListView.as_view(), name='factura-list'),
     path('api/facturas/subir/', FacturaUploadView.as_view(), name='factura-upload'),
     path('api/facturas/<int:pk>/', FacturaDetailView.as_view(), name='factura-detail'),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)   
