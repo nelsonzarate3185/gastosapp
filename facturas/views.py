@@ -3,13 +3,43 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.conf import settings
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login, logout
+from django.contrib import messages
 from .models import Factura
 from .serializers import FacturaSerializer
-import pytesseract
-from PIL import Image
+import requests
 import re
 
-pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
+
+def ocr_con_api(imagen):
+    """
+    Usa OCR.space API para extraer texto de la imagen.
+    """
+    api_key = settings.OCR_API_KEY
+
+    response = requests.post(
+        'https://api.ocr.space/parse/image',
+        files={'image': imagen},
+        data={
+            'apikey': api_key,
+            'language': 'spa',
+            'isOverlayRequired': False,
+        },
+        timeout=30
+    )
+
+    result = response.json()
+
+    if result.get('IsErroredOnProcessing'):
+        raise Exception(result.get('ErrorMessage', 'Error en OCR'))
+
+    parsed = result.get('ParsedResults', [])
+    if not parsed:
+        return ''
+
+    return parsed[0].get('ParsedText', '')
 
 
 def extraer_datos_ocr(texto):
@@ -36,10 +66,7 @@ def extraer_datos_ocr(texto):
         datos['ruc'] = ruc.group()
 
     # Buscar importe total
-    importe = re.search(
-        r'[Tt]otal[:\s]*[\$Gs\.]*\s*([\d.,]+)',
-        texto
-    )
+    importe = re.search(r'[Tt]otal[:\s]*[\$Gs\.]*\s*([\d.,]+)', texto)
     if importe:
         monto_str = importe.group(1).replace('.', '').replace(',', '.').strip()
         try:
@@ -78,10 +105,11 @@ class FacturaUploadView(APIView):
             )
 
         try:
-            img = Image.open(imagen)
-            texto = pytesseract.image_to_string(img, lang='spa')
+            # Extraer texto con OCR.space API
+            texto = ocr_con_api(imagen)
             datos = extraer_datos_ocr(texto)
 
+            # Guardar en base de datos
             imagen.seek(0)
             factura = Factura.objects.create(
                 imagen=imagen,
@@ -147,10 +175,7 @@ class FacturaDetailView(APIView):
                 {'error': 'Factura no encontrada.'},
                 status=status.HTTP_404_NOT_FOUND
             )
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth import authenticate, login, logout
-from django.contrib import messages
+
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -166,11 +191,13 @@ def login_view(request):
             messages.error(request, 'Usuario o contraseña incorrectos.')
     return render(request, 'pwa/login.html')
 
+
 def logout_view(request):
     logout(request)
     return redirect('login')
 
+
 @login_required(login_url='login')
 def home_view(request):
     facturas = Factura.objects.all()[:20]
-    return render(request, 'pwa/home.html', {'facturas': facturas})            
+    return render(request, 'pwa/home.html', {'facturas': facturas})

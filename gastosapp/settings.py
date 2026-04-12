@@ -96,3 +96,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Tesseract
 TESSERACT_CMD = config('TESSERACT_CMD', default=r'C:\Program Files\Tesseract-OCR\tesseract.exe')
+
+OCR_API_KEY = config('K85707288288957', default='helloworld')
