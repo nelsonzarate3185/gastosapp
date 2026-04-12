@@ -1,0 +1,289 @@
+{% extends 'pwa/base.html' %}
+
+{% block content %}
+<style>
+    .upload-card {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    .upload-card h2 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 16px;
+    }
+    .tipo-selector {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .tipo-btn {
+        flex: 1;
+        padding: 10px;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        background: white;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.2s;
+        color: #666;
+    }
+    .tipo-btn.active {
+        border-color: #1a73e8;
+        background: #e8f0fe;
+        color: #1a73e8;
+    }
+    .preview-box {
+        border: 2px dashed #e0e0e0;
+        border-radius: 12px;
+        height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 16px;
+        overflow: hidden;
+        background: #fafafa;
+    }
+    .preview-box img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+    .preview-placeholder {
+        text-align: center;
+        color: #aaa;
+    }
+    .preview-placeholder span {
+        font-size: 48px;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .preview-placeholder p {
+        font-size: 14px;
+    }
+    #fileInput {
+        display: none;
+    }
+    .loading {
+        display: none;
+        text-align: center;
+        padding: 16px;
+        color: #1a73e8;
+        font-weight: 600;
+    }
+    .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #e8f0fe;
+        border-top-color: #1a73e8;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    .facturas-section h2 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 16px;
+    }
+    .factura-card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border-left: 4px solid #1a73e8;
+    }
+    .factura-card.pagada { border-left-color: #34a853; }
+    .factura-card.vencida { border-left-color: #ea4335; }
+    .factura-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+    .factura-proveedor {
+        font-weight: 700;
+        font-size: 15px;
+        color: #333;
+    }
+    .factura-importe {
+        font-weight: 700;
+        font-size: 15px;
+        color: #1a73e8;
+    }
+    .factura-detail {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 4px;
+    }
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-top: 8px;
+    }
+    .badge-pendiente { background: #fff3e0; color: #e65100; }
+    .badge-pagada { background: #e6f4ea; color: #137333; }
+    .badge-vencida { background: #fce8e6; color: #c5221f; }
+    .badge-tipo { background: #e8f0fe; color: #1a73e8; margin-left: 6px; }
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #aaa;
+    }
+    .empty-state span { font-size: 48px; display: block; margin-bottom: 12px; }
+</style>
+
+<!-- Tarjeta de subida -->
+<div class="upload-card">
+    <h2>📷 Nueva Factura</h2>
+
+    <div class="tipo-selector">
+        <button class="tipo-btn active" onclick="setTipo('electronica', this)">⚡ Electrónica</button>
+        <button class="tipo-btn" onclick="setTipo('no_electronica', this)">📄 No Electrónica</button>
+    </div>
+
+    <div class="preview-box" onclick="document.getElementById('fileInput').click()">
+        <div class="preview-placeholder" id="placeholder">
+            <span>📸</span>
+            <p>Tocá para fotografiar<br>o seleccionar imagen</p>
+        </div>
+        <img id="preview" style="display:none;">
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*" capture="environment">
+
+    <div class="loading" id="loading">
+        <span class="spinner"></span> Procesando factura...
+    </div>
+
+    <button class="btn btn-primary" id="btnSubir" onclick="subirFactura()" style="display:none;">
+        ✅ Procesar y Guardar
+    </button>
+</div>
+
+<!-- Lista de facturas -->
+<div class="facturas-section">
+    <h2>📋 Últimas Facturas</h2>
+
+    {% if facturas %}
+        {% for f in facturas %}
+        <div class="factura-card {{ f.estado }}">
+            <div class="factura-header">
+                <div class="factura-proveedor">
+                    {{ f.nombre_proveedor|default:"Sin proveedor" }}
+                </div>
+                <div class="factura-importe">
+                    {% if f.importe_total %}
+                        Gs. {{ f.importe_total|floatformat:0 }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+            <div class="factura-detail">🗓 {{ f.fecha_emision|default:"Sin fecha" }}</div>
+            <div class="factura-detail">🏷 Timbrado: {{ f.timbrado|default:"-" }}</div>
+            <div class="factura-detail">📋 RUC: {{ f.ruc|default:"-" }}</div>
+            <span class="badge badge-{{ f.estado }}">{{ f.get_estado_display }}</span>
+            <span class="badge badge-tipo">{{ f.get_tipo_display }}</span>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <span>📭</span>
+            <p>No hay facturas aún.<br>¡Subí tu primera factura!</p>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    let tipoSeleccionado = 'electronica';
+
+    function setTipo(tipo, btn) {
+        tipoSeleccionado = tipo;
+        document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    // Previsualizar imagen seleccionada
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            document.getElementById('placeholder').style.display = 'none';
+            const img = document.getElementById('preview');
+            img.src = ev.target.result;
+            img.style.display = 'block';
+            document.getElementById('btnSubir').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // Subir factura al backend
+    async function subirFactura() {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('btnSubir').style.display = 'none';
+
+        const formData = new FormData();
+        formData.append('imagen', file);
+        formData.append('tipo', tipoSeleccionado);
+
+        try {
+            const response = await fetch('/api/facturas/subir/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: formData,
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                const data = await response.json();
+                alert('Error: ' + (data.error || 'No se pudo procesar la factura.'));
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('btnSubir').style.display = 'block';
+            }
+        } catch (err) {
+            alert('Error de conexión. Intentá de nuevo.');
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('btnSubir').style.display = 'block';
+        }
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}
