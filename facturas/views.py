@@ -150,27 +150,17 @@ class FacturaUploadView(APIView):
             texto = ocr_con_api(imagen)
             datos = extraer_datos_ocr(texto)
 
-            imagen.seek(0)
-            factura = Factura.objects.create(
-                imagen=imagen,
-                tipo=tipo,
-                texto_ocr=datos['texto_ocr'],
-                nombre_proveedor=datos['nombre_proveedor'],
-                timbrado=datos['timbrado'],
-                ruc=datos['ruc'],
-                importe_total=datos['importe_total'],
-                fecha_emision=datos['fecha_emision'],
-            )
-
-            serializer = FacturaSerializer(factura)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            # TEMPORAL: devolver texto crudo para debug
+            return Response({
+                'texto_ocr': texto,
+                'datos_extraidos': datos
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 class FacturaListView(APIView):
     def get(self, request):
