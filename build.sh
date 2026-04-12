@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -o errexit
 
+# Instalar Tesseract OCR y soporte para español
+apt-get install -y tesseract-ocr tesseract-ocr-spa
+
 pip install -r requirements.txt
 python manage.py collectstatic --no-input
 python manage.py migrate

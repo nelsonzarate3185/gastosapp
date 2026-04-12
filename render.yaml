@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: gastosapp
+    runtime: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn gastosapp.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
