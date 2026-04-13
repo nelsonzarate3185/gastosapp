@@ -3,11 +3,8 @@
 {% block content %}
 <style>
     .upload-card {
-        background: white;
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 24px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        background: white; border-radius: 16px; padding: 24px;
+        margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     }
     .upload-card h2 { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 16px; }
     .tipo-selector { display: flex; gap: 10px; margin-bottom: 16px; }
@@ -36,15 +33,9 @@
         margin-right: 8px; vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Vista previa OCR */
     .ocr-preview {
-        display: none;
-        background: white;
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 24px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        display: none; background: white; border-radius: 16px; padding: 24px;
+        margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         border-top: 4px solid #1a73e8;
     }
     .ocr-preview h2 { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 6px; }
@@ -56,28 +47,21 @@
         border-radius: 10px; font-size: 14px; color: #333;
         box-sizing: border-box; transition: border-color 0.2s;
     }
-    .form-group input:focus, .form-group select:focus {
-        outline: none; border-color: #1a73e8;
-    }
+    .form-group input:focus, .form-group select:focus { outline: none; border-color: #1a73e8; }
     .form-group input.ocr-filled { background: #f0f7ff; border-color: #90caf9; }
     .ocr-tag {
         font-size: 11px; color: #1a73e8; font-weight: 600;
-        background: #e8f0fe; padding: 2px 8px; border-radius: 10px;
-        margin-left: 6px;
+        background: #e8f0fe; padding: 2px 8px; border-radius: 10px; margin-left: 6px;
     }
     .btn-row { display: flex; gap: 10px; margin-top: 20px; }
     .btn-confirmar {
         flex: 1; padding: 14px; background: #1a73e8; color: white;
-        border: none; border-radius: 12px; font-size: 15px;
-        font-weight: 700; cursor: pointer;
+        border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer;
     }
     .btn-cancelar {
         padding: 14px 20px; background: #f5f5f5; color: #666;
-        border: none; border-radius: 12px; font-size: 15px;
-        font-weight: 600; cursor: pointer;
+        border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
     }
-
-    /* Lista facturas */
     .facturas-section h2 { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 16px; }
     .factura-card {
         background: white; border-radius: 12px; padding: 16px;
@@ -102,12 +86,10 @@
 <!-- Tarjeta de subida -->
 <div class="upload-card" id="cardUpload">
     <h2>📷 Nueva Factura</h2>
-
     <div class="tipo-selector">
         <button class="tipo-btn active" onclick="setTipo('electronica', this)">⚡ Electrónica</button>
         <button class="tipo-btn" onclick="setTipo('no_electronica', this)">📄 No Electrónica</button>
     </div>
-
     <div class="preview-box" onclick="document.getElementById('fileInput').click()">
         <div class="preview-placeholder" id="placeholder">
             <span>📸</span>
@@ -115,23 +97,19 @@
         </div>
         <img id="preview" style="display:none;">
     </div>
-
     <input type="file" id="fileInput" accept="image/*">
-
     <div class="loading" id="loading">
         <span class="spinner"></span> Procesando factura con OCR...
     </div>
-
     <button class="btn btn-primary" id="btnSubir" onclick="procesarFactura()" style="display:none; width:100%;">
         🔍 Escanear Factura
     </button>
 </div>
 
-<!-- Vista previa OCR para confirmar -->
+<!-- Vista previa OCR -->
 <div class="ocr-preview" id="ocrPreview">
     <h2>✏️ Revisá los datos extraídos</h2>
-    <p class="subtitle">Los campos marcados con <span class="ocr-tag">OCR</span> fueron detectados automáticamente. Podés editarlos antes de guardar.</p>
-
+    <p class="subtitle">Los campos con <span class="ocr-tag">OCR</span> fueron detectados automáticamente. Podés editarlos antes de guardar.</p>
     <div class="form-group">
         <label>Proveedor <span class="ocr-tag" id="tag_proveedor">OCR</span></label>
         <input type="text" id="f_proveedor" placeholder="Nombre del proveedor">
@@ -164,12 +142,10 @@
         <label>Notas</label>
         <input type="text" id="f_notas" placeholder="Observaciones opcionales">
     </div>
-
     <div class="btn-row">
         <button class="btn-cancelar" onclick="cancelarPreview()">✖ Cancelar</button>
         <button class="btn-confirmar" onclick="confirmarFactura()">✅ Confirmar y Guardar</button>
     </div>
-
     <div class="loading" id="loadingConfirmar" style="margin-top:12px;">
         <span class="spinner"></span> Guardando factura...
     </div>
@@ -217,7 +193,6 @@
         const file = e.target.files[0];
         if (!file) return;
         imagenFile = file;
-
         const reader = new FileReader();
         reader.onload = function(ev) {
             document.getElementById('placeholder').style.display = 'none';
@@ -229,96 +204,46 @@
         reader.readAsDataURL(file);
     });
 
-function comprimirImagen(file, maxWidth) {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                // Redimensionar si es muy grande
-                if (width > maxWidth) {
-                    height = Math.round((height * maxWidth) / width);
-                    width = maxWidth;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                // Comprimir a JPEG calidad 80%
-                canvas.toBlob((blob) => {
-                    resolve(blob);
-                }, 'image/jpeg', 0.8);
+    function comprimirImagen(file, maxWidth) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    canvas.toBlob((blob) => { resolve(blob); }, 'image/jpeg', 0.8);
+                };
+                img.src = e.target.result;
             };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
-}
-
-   async function procesarFactura() {
-    if (!imagenFile) return;
-
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('btnSubir').style.display = 'none';
-
-    try {
-        // Comprimir imagen antes de enviar
-        const imagenComprimida = await comprimirImagen(imagenFile, 800);
-
-        const formData = new FormData();
-        formData.append('imagen', imagenComprimida, imagenFile.name);
-        formData.append('tipo', tipoSeleccionado);
-
-        const response = await fetch('/api/facturas/subir/', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': getCookie('csrftoken') },
-            body: formData,
+            reader.readAsDataURL(file);
         });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            llenarFormularioOCR(data.datos_extraidos);
-            textoOcrGuardado = data.texto_ocr || '';
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('cardUpload').style.display = 'none';
-            document.getElementById('ocrPreview').style.display = 'block';
-        } else {
-            alert('Error: ' + (data.error || 'No se pudo procesar la factura.'));
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('btnSubir').style.display = 'block';
-        }
-    } catch (err) {
-        alert('Error de conexión. Intentá de nuevo.');
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('btnSubir').style.display = 'block';
     }
-}
-        if (!imagenFile) return;
 
+    async function procesarFactura() {
+        if (!imagenFile) return;
         document.getElementById('loading').style.display = 'block';
         document.getElementById('btnSubir').style.display = 'none';
-
-        const formData = new FormData();
-        formData.append('imagen', imagenFile);
-        formData.append('tipo', tipoSeleccionado);
-
         try {
+            const imagenComprimida = await comprimirImagen(imagenFile, 800);
+            const formData = new FormData();
+            formData.append('imagen', imagenComprimida, imagenFile.name);
+            formData.append('tipo', tipoSeleccionado);
             const response = await fetch('/api/facturas/subir/', {
                 method: 'POST',
                 headers: { 'X-CSRFToken': getCookie('csrftoken') },
                 body: formData,
             });
-
             const data = await response.json();
-
             if (response.ok) {
                 llenarFormularioOCR(data.datos_extraidos);
                 textoOcrGuardado = data.texto_ocr || '';
@@ -338,7 +263,6 @@ function comprimirImagen(file, maxWidth) {
     }
 
     function llenarFormularioOCR(datos) {
-        // Llenar campos y marcar cuáles vinieron del OCR
         setCampo('f_proveedor', 'tag_proveedor', datos.nombre_proveedor);
         setCampo('f_ruc', 'tag_ruc', datos.ruc);
         setCampo('f_timbrado', 'tag_timbrado', datos.timbrado);
@@ -378,7 +302,7 @@ function comprimirImagen(file, maxWidth) {
         const input = document.getElementById(inputId);
         const tag = document.getElementById(tagId);
         if (valor) {
-            input.value = valor; // Ya viene en formato YYYY-MM-DD desde Django
+            input.value = valor;
             input.classList.add('ocr-filled');
             tag.style.display = 'inline';
         } else {
@@ -407,18 +331,15 @@ function comprimirImagen(file, maxWidth) {
         formData.append('estado', document.getElementById('f_estado').value);
         formData.append('notas', document.getElementById('f_notas').value);
         formData.append('texto_ocr', textoOcrGuardado);
-
         document.getElementById('loadingConfirmar').style.display = 'block';
         document.querySelector('.btn-confirmar').disabled = true;
         document.querySelector('.btn-cancelar').disabled = true;
-
         try {
             const response = await fetch('/api/facturas/confirmar/', {
                 method: 'POST',
                 headers: { 'X-CSRFToken': getCookie('csrftoken') },
                 body: formData,
             });
-
             if (response.ok) {
                 window.location.reload();
             } else {
