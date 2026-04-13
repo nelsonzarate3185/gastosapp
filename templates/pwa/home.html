@@ -9,146 +9,98 @@
         margin-bottom: 24px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     }
-    .upload-card h2 {
-        font-size: 18px;
-        font-weight: 700;
-        color: #333;
-        margin-bottom: 16px;
-    }
-    .tipo-selector {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 16px;
-    }
+    .upload-card h2 { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 16px; }
+    .tipo-selector { display: flex; gap: 10px; margin-bottom: 16px; }
     .tipo-btn {
-        flex: 1;
-        padding: 10px;
-        border: 2px solid #e0e0e0;
-        border-radius: 10px;
-        background: white;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        text-align: center;
-        transition: all 0.2s;
-        color: #666;
+        flex: 1; padding: 10px; border: 2px solid #e0e0e0;
+        border-radius: 10px; background: white; font-size: 13px;
+        font-weight: 600; cursor: pointer; text-align: center;
+        transition: all 0.2s; color: #666;
     }
-    .tipo-btn.active {
-        border-color: #1a73e8;
-        background: #e8f0fe;
-        color: #1a73e8;
-    }
+    .tipo-btn.active { border-color: #1a73e8; background: #e8f0fe; color: #1a73e8; }
     .preview-box {
-        border: 2px dashed #e0e0e0;
-        border-radius: 12px;
-        height: 200px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 16px;
-        overflow: hidden;
-        background: #fafafa;
+        border: 2px dashed #e0e0e0; border-radius: 12px; height: 200px;
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 16px; overflow: hidden; background: #fafafa; cursor: pointer;
     }
-    .preview-box img {
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-    }
-    .preview-placeholder {
-        text-align: center;
-        color: #aaa;
-    }
-    .preview-placeholder span {
-        font-size: 48px;
-        display: block;
-        margin-bottom: 8px;
-    }
-    .preview-placeholder p {
-        font-size: 14px;
-    }
-    #fileInput {
-        display: none;
-    }
-    .loading {
-        display: none;
-        text-align: center;
-        padding: 16px;
-        color: #1a73e8;
-        font-weight: 600;
-    }
+    .preview-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .preview-placeholder { text-align: center; color: #aaa; }
+    .preview-placeholder span { font-size: 48px; display: block; margin-bottom: 8px; }
+    .preview-placeholder p { font-size: 14px; }
+    #fileInput { display: none; }
+    .loading { display: none; text-align: center; padding: 16px; color: #1a73e8; font-weight: 600; }
     .spinner {
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        border: 3px solid #e8f0fe;
-        border-top-color: #1a73e8;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-        margin-right: 8px;
-        vertical-align: middle;
+        display: inline-block; width: 20px; height: 20px;
+        border: 3px solid #e8f0fe; border-top-color: #1a73e8;
+        border-radius: 50%; animation: spin 0.8s linear infinite;
+        margin-right: 8px; vertical-align: middle;
     }
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-    .facturas-section h2 {
-        font-size: 18px;
-        font-weight: 700;
-        color: #333;
-        margin-bottom: 16px;
-    }
-    .factura-card {
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Vista previa OCR */
+    .ocr-preview {
+        display: none;
         background: white;
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        border-top: 4px solid #1a73e8;
+    }
+    .ocr-preview h2 { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 6px; }
+    .ocr-preview p.subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 6px; }
+    .form-group input, .form-group select {
+        width: 100%; padding: 10px 14px; border: 1.5px solid #e0e0e0;
+        border-radius: 10px; font-size: 14px; color: #333;
+        box-sizing: border-box; transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus {
+        outline: none; border-color: #1a73e8;
+    }
+    .form-group input.ocr-filled { background: #f0f7ff; border-color: #90caf9; }
+    .ocr-tag {
+        font-size: 11px; color: #1a73e8; font-weight: 600;
+        background: #e8f0fe; padding: 2px 8px; border-radius: 10px;
+        margin-left: 6px;
+    }
+    .btn-row { display: flex; gap: 10px; margin-top: 20px; }
+    .btn-confirmar {
+        flex: 1; padding: 14px; background: #1a73e8; color: white;
+        border: none; border-radius: 12px; font-size: 15px;
+        font-weight: 700; cursor: pointer;
+    }
+    .btn-cancelar {
+        padding: 14px 20px; background: #f5f5f5; color: #666;
+        border: none; border-radius: 12px; font-size: 15px;
+        font-weight: 600; cursor: pointer;
+    }
+
+    /* Lista facturas */
+    .facturas-section h2 { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 16px; }
+    .factura-card {
+        background: white; border-radius: 12px; padding: 16px;
+        margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         border-left: 4px solid #1a73e8;
     }
     .factura-card.pagada { border-left-color: #34a853; }
     .factura-card.vencida { border-left-color: #ea4335; }
-    .factura-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 8px;
-    }
-    .factura-proveedor {
-        font-weight: 700;
-        font-size: 15px;
-        color: #333;
-    }
-    .factura-importe {
-        font-weight: 700;
-        font-size: 15px;
-        color: #1a73e8;
-    }
-    .factura-detail {
-        font-size: 13px;
-        color: #666;
-        margin-bottom: 4px;
-    }
-    .badge {
-        display: inline-block;
-        padding: 3px 10px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-        margin-top: 8px;
-    }
+    .factura-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .factura-proveedor { font-weight: 700; font-size: 15px; color: #333; }
+    .factura-importe { font-weight: 700; font-size: 15px; color: #1a73e8; }
+    .factura-detail { font-size: 13px; color: #666; margin-bottom: 4px; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 8px; }
     .badge-pendiente { background: #fff3e0; color: #e65100; }
     .badge-pagada { background: #e6f4ea; color: #137333; }
     .badge-vencida { background: #fce8e6; color: #c5221f; }
     .badge-tipo { background: #e8f0fe; color: #1a73e8; margin-left: 6px; }
-    .empty-state {
-        text-align: center;
-        padding: 40px 20px;
-        color: #aaa;
-    }
+    .empty-state { text-align: center; padding: 40px 20px; color: #aaa; }
     .empty-state span { font-size: 48px; display: block; margin-bottom: 12px; }
 </style>
 
 <!-- Tarjeta de subida -->
-<div class="upload-card">
+<div class="upload-card" id="cardUpload">
     <h2>📷 Nueva Factura</h2>
 
     <div class="tipo-selector">
@@ -167,31 +119,72 @@
     <input type="file" id="fileInput" accept="image/*" capture="environment">
 
     <div class="loading" id="loading">
-        <span class="spinner"></span> Procesando factura...
+        <span class="spinner"></span> Procesando factura con OCR...
     </div>
 
-    <button class="btn btn-primary" id="btnSubir" onclick="subirFactura()" style="display:none;">
-        ✅ Procesar y Guardar
+    <button class="btn btn-primary" id="btnSubir" onclick="procesarFactura()" style="display:none; width:100%;">
+        🔍 Escanear Factura
     </button>
+</div>
+
+<!-- Vista previa OCR para confirmar -->
+<div class="ocr-preview" id="ocrPreview">
+    <h2>✏️ Revisá los datos extraídos</h2>
+    <p class="subtitle">Los campos marcados con <span class="ocr-tag">OCR</span> fueron detectados automáticamente. Podés editarlos antes de guardar.</p>
+
+    <div class="form-group">
+        <label>Proveedor <span class="ocr-tag" id="tag_proveedor">OCR</span></label>
+        <input type="text" id="f_proveedor" placeholder="Nombre del proveedor">
+    </div>
+    <div class="form-group">
+        <label>RUC <span class="ocr-tag" id="tag_ruc">OCR</span></label>
+        <input type="text" id="f_ruc" placeholder="Ej: 80012345-1">
+    </div>
+    <div class="form-group">
+        <label>Timbrado <span class="ocr-tag" id="tag_timbrado">OCR</span></label>
+        <input type="text" id="f_timbrado" placeholder="Número de timbrado">
+    </div>
+    <div class="form-group">
+        <label>Importe Total (Gs.) <span class="ocr-tag" id="tag_importe">OCR</span></label>
+        <input type="number" id="f_importe" placeholder="0">
+    </div>
+    <div class="form-group">
+        <label>Fecha de Emisión <span class="ocr-tag" id="tag_fecha">OCR</span></label>
+        <input type="date" id="f_fecha">
+    </div>
+    <div class="form-group">
+        <label>Estado</label>
+        <select id="f_estado">
+            <option value="pendiente">Pendiente</option>
+            <option value="pagada">Pagada</option>
+            <option value="vencida">Vencida</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Notas</label>
+        <input type="text" id="f_notas" placeholder="Observaciones opcionales">
+    </div>
+
+    <div class="btn-row">
+        <button class="btn-cancelar" onclick="cancelarPreview()">✖ Cancelar</button>
+        <button class="btn-confirmar" onclick="confirmarFactura()">✅ Confirmar y Guardar</button>
+    </div>
+
+    <div class="loading" id="loadingConfirmar" style="margin-top:12px;">
+        <span class="spinner"></span> Guardando factura...
+    </div>
 </div>
 
 <!-- Lista de facturas -->
 <div class="facturas-section">
     <h2>📋 Últimas Facturas</h2>
-
     {% if facturas %}
         {% for f in facturas %}
         <div class="factura-card {{ f.estado }}">
             <div class="factura-header">
-                <div class="factura-proveedor">
-                    {{ f.nombre_proveedor|default:"Sin proveedor" }}
-                </div>
+                <div class="factura-proveedor">{{ f.nombre_proveedor|default:"Sin proveedor" }}</div>
                 <div class="factura-importe">
-                    {% if f.importe_total %}
-                        Gs. {{ f.importe_total|floatformat:0 }}
-                    {% else %}
-                        -
-                    {% endif %}
+                    {% if f.importe_total %}Gs. {{ f.importe_total|floatformat:0 }}{% else %}-{% endif %}
                 </div>
             </div>
             <div class="factura-detail">🗓 {{ f.fecha_emision|default:"Sin fecha" }}</div>
@@ -203,7 +196,7 @@
         {% endfor %}
     {% else %}
         <div class="empty-state">
-            <span>📭</span>
+            <span>📂</span>
             <p>No hay facturas aún.<br>¡Subí tu primera factura!</p>
         </div>
     {% endif %}
@@ -211,6 +204,8 @@
 
 <script>
     let tipoSeleccionado = 'electronica';
+    let imagenFile = null;
+    let textoOcrGuardado = '';
 
     function setTipo(tipo, btn) {
         tipoSeleccionado = tipo;
@@ -218,10 +213,10 @@
         btn.classList.add('active');
     }
 
-    // Previsualizar imagen seleccionada
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
+        imagenFile = file;
 
         const reader = new FileReader();
         reader.onload = function(ev) {
@@ -234,32 +229,32 @@
         reader.readAsDataURL(file);
     });
 
-    // Subir factura al backend
-    async function subirFactura() {
-        const fileInput = document.getElementById('fileInput');
-        const file = fileInput.files[0];
-        if (!file) return;
+    async function procesarFactura() {
+        if (!imagenFile) return;
 
         document.getElementById('loading').style.display = 'block';
         document.getElementById('btnSubir').style.display = 'none';
 
         const formData = new FormData();
-        formData.append('imagen', file);
+        formData.append('imagen', imagenFile);
         formData.append('tipo', tipoSeleccionado);
 
         try {
             const response = await fetch('/api/facturas/subir/', {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                },
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
                 body: formData,
             });
 
+            const data = await response.json();
+
             if (response.ok) {
-                window.location.reload();
+                llenarFormularioOCR(data.datos_extraidos);
+                textoOcrGuardado = data.texto_ocr || '';
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('cardUpload').style.display = 'none';
+                document.getElementById('ocrPreview').style.display = 'block';
             } else {
-                const data = await response.json();
                 alert('Error: ' + (data.error || 'No se pudo procesar la factura.'));
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('btnSubir').style.display = 'block';
@@ -268,6 +263,105 @@
             alert('Error de conexión. Intentá de nuevo.');
             document.getElementById('loading').style.display = 'none';
             document.getElementById('btnSubir').style.display = 'block';
+        }
+    }
+
+    function llenarFormularioOCR(datos) {
+        // Llenar campos y marcar cuáles vinieron del OCR
+        setCampo('f_proveedor', 'tag_proveedor', datos.nombre_proveedor);
+        setCampo('f_ruc', 'tag_ruc', datos.ruc);
+        setCampo('f_timbrado', 'tag_timbrado', datos.timbrado);
+        setCampoNumerico('f_importe', 'tag_importe', datos.importe_total);
+        setFecha('f_fecha', 'tag_fecha', datos.fecha_emision);
+    }
+
+    function setCampo(inputId, tagId, valor) {
+        const input = document.getElementById(inputId);
+        const tag = document.getElementById(tagId);
+        if (valor && valor.toString().trim() !== '') {
+            input.value = valor;
+            input.classList.add('ocr-filled');
+            tag.style.display = 'inline';
+        } else {
+            input.value = '';
+            input.classList.remove('ocr-filled');
+            tag.style.display = 'none';
+        }
+    }
+
+    function setCampoNumerico(inputId, tagId, valor) {
+        const input = document.getElementById(inputId);
+        const tag = document.getElementById(tagId);
+        if (valor !== null && valor !== undefined && valor !== '') {
+            input.value = valor;
+            input.classList.add('ocr-filled');
+            tag.style.display = 'inline';
+        } else {
+            input.value = '';
+            input.classList.remove('ocr-filled');
+            tag.style.display = 'none';
+        }
+    }
+
+    function setFecha(inputId, tagId, valor) {
+        const input = document.getElementById(inputId);
+        const tag = document.getElementById(tagId);
+        if (valor) {
+            input.value = valor; // Ya viene en formato YYYY-MM-DD desde Django
+            input.classList.add('ocr-filled');
+            tag.style.display = 'inline';
+        } else {
+            input.value = '';
+            input.classList.remove('ocr-filled');
+            tag.style.display = 'none';
+        }
+    }
+
+    function cancelarPreview() {
+        document.getElementById('ocrPreview').style.display = 'none';
+        document.getElementById('cardUpload').style.display = 'block';
+        document.getElementById('btnSubir').style.display = 'block';
+        document.getElementById('loading').style.display = 'none';
+    }
+
+    async function confirmarFactura() {
+        const formData = new FormData();
+        formData.append('imagen', imagenFile);
+        formData.append('tipo', tipoSeleccionado);
+        formData.append('nombre_proveedor', document.getElementById('f_proveedor').value);
+        formData.append('ruc', document.getElementById('f_ruc').value);
+        formData.append('timbrado', document.getElementById('f_timbrado').value);
+        formData.append('importe_total', document.getElementById('f_importe').value || '');
+        formData.append('fecha_emision', document.getElementById('f_fecha').value || '');
+        formData.append('estado', document.getElementById('f_estado').value);
+        formData.append('notas', document.getElementById('f_notas').value);
+        formData.append('texto_ocr', textoOcrGuardado);
+
+        document.getElementById('loadingConfirmar').style.display = 'block';
+        document.querySelector('.btn-confirmar').disabled = true;
+        document.querySelector('.btn-cancelar').disabled = true;
+
+        try {
+            const response = await fetch('/api/facturas/confirmar/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                body: formData,
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                const data = await response.json();
+                alert('Error al guardar: ' + JSON.stringify(data));
+                document.getElementById('loadingConfirmar').style.display = 'none';
+                document.querySelector('.btn-confirmar').disabled = false;
+                document.querySelector('.btn-cancelar').disabled = false;
+            }
+        } catch (err) {
+            alert('Error de conexión. Intentá de nuevo.');
+            document.getElementById('loadingConfirmar').style.display = 'none';
+            document.querySelector('.btn-confirmar').disabled = false;
+            document.querySelector('.btn-cancelar').disabled = false;
         }
     }
 

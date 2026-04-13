@@ -200,7 +200,17 @@ class FacturaDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+class FacturaConfirmarView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
 
+    def post(self, request):
+        serializer = FacturaSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('home')
@@ -219,6 +229,7 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect('login')
+
 
 
 @login_required(login_url='login')
