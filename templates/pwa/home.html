@@ -116,7 +116,7 @@
         <img id="preview" style="display:none;">
     </div>
 
-    <input type="file" id="fileInput" accept="image/*" capture="environment">
+    <input type="file" id="fileInput" accept="image/*">
 
     <div class="loading" id="loading">
         <span class="spinner"></span> Procesando factura con OCR...
@@ -229,7 +229,78 @@
         reader.readAsDataURL(file);
     });
 
-    async function procesarFactura() {
+function comprimirImagen(file, maxWidth) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // Redimensionar si es muy grande
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Comprimir a JPEG calidad 80%
+                canvas.toBlob((blob) => {
+                    resolve(blob);
+                }, 'image/jpeg', 0.8);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+   async function procesarFactura() {
+    if (!imagenFile) return;
+
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('btnSubir').style.display = 'none';
+
+    try {
+        // Comprimir imagen antes de enviar
+        const imagenComprimida = await comprimirImagen(imagenFile, 800);
+
+        const formData = new FormData();
+        formData.append('imagen', imagenComprimida, imagenFile.name);
+        formData.append('tipo', tipoSeleccionado);
+
+        const response = await fetch('/api/facturas/subir/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            body: formData,
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            llenarFormularioOCR(data.datos_extraidos);
+            textoOcrGuardado = data.texto_ocr || '';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('cardUpload').style.display = 'none';
+            document.getElementById('ocrPreview').style.display = 'block';
+        } else {
+            alert('Error: ' + (data.error || 'No se pudo procesar la factura.'));
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('btnSubir').style.display = 'block';
+        }
+    } catch (err) {
+        alert('Error de conexión. Intentá de nuevo.');
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('btnSubir').style.display = 'block';
+    }
+}
         if (!imagenFile) return;
 
         document.getElementById('loading').style.display = 'block';
