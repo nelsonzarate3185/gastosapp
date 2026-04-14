@@ -2,6 +2,79 @@
 
 {% block content %}
 <style>
+    /* === DASHBOARD === */
+    .dashboard {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+    .dash-card {
+        background: white;
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        text-align: center;
+    }
+    .dash-card.full { grid-column: 1 / -1; }
+    .dash-card h3 { font-size: 12px; color: #888; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; }
+    .dash-card .valor { font-size: 22px; font-weight: 800; color: #1a73e8; }
+    .dash-card .sub { font-size: 12px; color: #aaa; margin-top: 4px; }
+    .chart-bars {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        height: 80px;
+        gap: 4px;
+        margin-top: 12px;
+    }
+    .bar-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .bar {
+        width: 100%;
+        background: #1a73e8;
+        border-radius: 4px 4px 0 0;
+        min-height: 2px;
+        transition: height 0.3s;
+    }
+    .bar.mes-actual { background: #34a853; }
+    .bar-label { font-size: 9px; color: #aaa; }
+
+    /* === FILTROS === */
+    .filtros-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    .filtros-card h3 { font-size: 15px; font-weight: 700; color: #333; margin-bottom: 16px; }
+    .filtros-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .filtros-grid .full { grid-column: 1 / -1; }
+    .filtro-group label { display: block; font-size: 11px; font-weight: 600; color: #888; margin-bottom: 4px; text-transform: uppercase; }
+    .filtro-group input, .filtro-group select {
+        width: 100%; padding: 9px 12px; border: 1.5px solid #e0e0e0;
+        border-radius: 10px; font-size: 13px; color: #333;
+        box-sizing: border-box;
+    }
+    .filtro-group input:focus, .filtro-group select:focus { outline: none; border-color: #1a73e8; }
+    .btn-filtrar {
+        width: 100%; padding: 12px; background: #1a73e8; color: white;
+        border: none; border-radius: 10px; font-size: 14px;
+        font-weight: 700; cursor: pointer; margin-top: 12px;
+    }
+    .btn-limpiar {
+        width: 100%; padding: 10px; background: #f5f5f5; color: #666;
+        border: none; border-radius: 10px; font-size: 13px;
+        font-weight: 600; cursor: pointer; margin-top: 6px;
+    }
+    .btn-excel {
+        width: 100%; padding: 12px; background: #34a853; color: white;
+        border: none; border-radius: 10px; font-size: 14px;
+        font-weight: 700; cursor: pointer; margin-top: 6px;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+
+    /* === UPLOAD === */
     .upload-card {
         background: white; border-radius: 16px; padding: 24px;
         margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);
@@ -16,14 +89,14 @@
     }
     .tipo-btn.active { border-color: #1a73e8; background: #e8f0fe; color: #1a73e8; }
     .preview-box {
-        border: 2px dashed #e0e0e0; border-radius: 12px; height: 200px;
+        border: 2px dashed #e0e0e0; border-radius: 12px; height: 180px;
         display: flex; align-items: center; justify-content: center;
         margin-bottom: 16px; overflow: hidden; background: #fafafa; cursor: pointer;
     }
     .preview-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .preview-placeholder { text-align: center; color: #aaa; }
-    .preview-placeholder span { font-size: 48px; display: block; margin-bottom: 8px; }
-    .preview-placeholder p { font-size: 14px; }
+    .preview-placeholder span { font-size: 40px; display: block; margin-bottom: 8px; }
+    .preview-placeholder p { font-size: 13px; }
     #fileInput { display: none; }
     .loading { display: none; text-align: center; padding: 16px; color: #1a73e8; font-weight: 600; }
     .spinner {
@@ -33,6 +106,8 @@
         margin-right: 8px; vertical-align: middle;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* === OCR PREVIEW === */
     .ocr-preview {
         display: none; background: white; border-radius: 16px; padding: 24px;
         margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);
@@ -62,7 +137,10 @@
         padding: 14px 20px; background: #f5f5f5; color: #666;
         border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
     }
+
+    /* === LISTA === */
     .facturas-section h2 { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 16px; }
+    .facturas-count { font-size: 13px; color: #888; font-weight: 400; margin-left: 8px; }
     .factura-card {
         background: white; border-radius: 12px; padding: 16px;
         margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -83,7 +161,62 @@
     .empty-state span { font-size: 48px; display: block; margin-bottom: 12px; }
 </style>
 
-<!-- Tarjeta de subida -->
+<!-- DASHBOARD -->
+<div class="dashboard">
+    <div class="dash-card">
+        <h3>Total {{ anio_actual }}</h3>
+        <div class="valor">Gs. {{ total_anual|floatformat:0 }}</div>
+        <div class="sub">Año completo</div>
+    </div>
+    <div class="dash-card">
+        <h3>Este Mes</h3>
+        <div class="valor">Gs. {{ total_mes|floatformat:0 }}</div>
+        <div class="sub">Mes actual</div>
+    </div>
+    <div class="dash-card full">
+        <h3>📊 Evolución mensual {{ anio_actual }}</h3>
+        <div class="chart-bars" id="chartBars"></div>
+    </div>
+</div>
+
+<!-- FILTROS + EXCEL -->
+<div class="filtros-card">
+    <h3>🔍 Buscar Facturas</h3>
+    <form method="GET" action="{% url 'home' %}">
+        <div class="filtros-grid">
+            <div class="filtro-group">
+                <label>Proveedor</label>
+                <input type="text" name="proveedor" value="{{ filtros.proveedor }}" placeholder="Nombre...">
+            </div>
+            <div class="filtro-group">
+                <label>RUC</label>
+                <input type="text" name="ruc" value="{{ filtros.ruc }}" placeholder="RUC...">
+            </div>
+            <div class="filtro-group">
+                <label>Desde</label>
+                <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}">
+            </div>
+            <div class="filtro-group">
+                <label>Hasta</label>
+                <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}">
+            </div>
+            <div class="filtro-group full">
+                <label>Estado</label>
+                <select name="estado">
+                    <option value="">Todos</option>
+                    <option value="pendiente" {% if filtros.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                    <option value="pagada" {% if filtros.estado == 'pagada' %}selected{% endif %}>Pagada</option>
+                    <option value="vencida" {% if filtros.estado == 'vencida' %}selected{% endif %}>Vencida</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn-filtrar">🔍 Buscar</button>
+        <a href="{% url 'home' %}" class="btn-limpiar" style="display:block; text-align:center; text-decoration:none;">✖ Limpiar filtros</a>
+    </form>
+    <a href="{% url 'exportar-excel' %}" class="btn-excel">📥 Descargar Excel</a>
+</div>
+
+<!-- UPLOAD -->
 <div class="upload-card" id="cardUpload">
     <h2>📷 Nueva Factura</h2>
     <div class="tipo-selector">
@@ -106,10 +239,10 @@
     </button>
 </div>
 
-<!-- Vista previa OCR -->
+<!-- OCR PREVIEW -->
 <div class="ocr-preview" id="ocrPreview">
     <h2>✏️ Revisá los datos extraídos</h2>
-    <p class="subtitle">Los campos con <span class="ocr-tag">OCR</span> fueron detectados automáticamente. Podés editarlos antes de guardar.</p>
+    <p class="subtitle">Los campos con <span class="ocr-tag">OCR</span> fueron detectados automáticamente.</p>
     <div class="form-group">
         <label>Proveedor <span class="ocr-tag" id="tag_proveedor">OCR</span></label>
         <input type="text" id="f_proveedor" placeholder="Nombre del proveedor">
@@ -151,9 +284,9 @@
     </div>
 </div>
 
-<!-- Lista de facturas -->
+<!-- LISTA -->
 <div class="facturas-section">
-    <h2>📋 Últimas Facturas</h2>
+    <h2>📋 Facturas <span class="facturas-count">({{ facturas|length }} resultados)</span></h2>
     {% if facturas %}
         {% for f in facturas %}
         <div class="factura-card {{ f.estado }}">
@@ -173,12 +306,32 @@
     {% else %}
         <div class="empty-state">
             <span>📂</span>
-            <p>No hay facturas aún.<br>¡Subí tu primera factura!</p>
+            <p>No se encontraron facturas.<br>Ajustá los filtros o subí una nueva.</p>
         </div>
     {% endif %}
 </div>
 
 <script>
+    // === CHART ===
+    const mesesData = {{ meses_data|safe }};
+    const mesActual = {{ anio_actual }};
+    const hoy = new Date();
+    const mesIdx = hoy.getMonth(); // 0-based
+
+    const maxValor = Math.max(...mesesData.map(m => m.total), 1);
+    const chartBars = document.getElementById('chartBars');
+    mesesData.forEach((m, i) => {
+        const altura = Math.max((m.total / maxValor) * 70, m.total > 0 ? 4 : 2);
+        const esActual = i === mesIdx;
+        chartBars.innerHTML += `
+            <div class="bar-item">
+                <div class="bar ${esActual ? 'mes-actual' : ''}" style="height:${altura}px" title="Gs. ${m.total.toLocaleString()}"></div>
+                <div class="bar-label">${m.mes}</div>
+            </div>
+        `;
+    });
+
+    // === UPLOAD ===
     let tipoSeleccionado = 'electronica';
     let imagenFile = null;
     let textoOcrGuardado = '';
@@ -219,8 +372,7 @@
                     }
                     canvas.width = width;
                     canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
+                    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
                     canvas.toBlob((blob) => { resolve(blob); }, 'image/jpeg', 0.8);
                 };
                 img.src = e.target.result;
@@ -251,7 +403,7 @@
                 document.getElementById('cardUpload').style.display = 'none';
                 document.getElementById('ocrPreview').style.display = 'block';
             } else {
-                alert('Error: ' + (data.error || 'No se pudo procesar la factura.'));
+                alert('Error: ' + (data.error || 'No se pudo procesar.'));
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('btnSubir').style.display = 'block';
             }
@@ -274,13 +426,9 @@
         const input = document.getElementById(inputId);
         const tag = document.getElementById(tagId);
         if (valor && valor.toString().trim() !== '') {
-            input.value = valor;
-            input.classList.add('ocr-filled');
-            tag.style.display = 'inline';
+            input.value = valor; input.classList.add('ocr-filled'); tag.style.display = 'inline';
         } else {
-            input.value = '';
-            input.classList.remove('ocr-filled');
-            tag.style.display = 'none';
+            input.value = ''; input.classList.remove('ocr-filled'); tag.style.display = 'none';
         }
     }
 
@@ -288,13 +436,9 @@
         const input = document.getElementById(inputId);
         const tag = document.getElementById(tagId);
         if (valor !== null && valor !== undefined && valor !== '') {
-            input.value = valor;
-            input.classList.add('ocr-filled');
-            tag.style.display = 'inline';
+            input.value = valor; input.classList.add('ocr-filled'); tag.style.display = 'inline';
         } else {
-            input.value = '';
-            input.classList.remove('ocr-filled');
-            tag.style.display = 'none';
+            input.value = ''; input.classList.remove('ocr-filled'); tag.style.display = 'none';
         }
     }
 
@@ -302,13 +446,9 @@
         const input = document.getElementById(inputId);
         const tag = document.getElementById(tagId);
         if (valor) {
-            input.value = valor;
-            input.classList.add('ocr-filled');
-            tag.style.display = 'inline';
+            input.value = valor; input.classList.add('ocr-filled'); tag.style.display = 'inline';
         } else {
-            input.value = '';
-            input.classList.remove('ocr-filled');
-            tag.style.display = 'none';
+            input.value = ''; input.classList.remove('ocr-filled'); tag.style.display = 'none';
         }
     }
 
@@ -331,9 +471,11 @@
         formData.append('estado', document.getElementById('f_estado').value);
         formData.append('notas', document.getElementById('f_notas').value);
         formData.append('texto_ocr', textoOcrGuardado);
+
         document.getElementById('loadingConfirmar').style.display = 'block';
         document.querySelector('.btn-confirmar').disabled = true;
         document.querySelector('.btn-cancelar').disabled = true;
+
         try {
             const response = await fetch('/api/facturas/confirmar/', {
                 method: 'POST',

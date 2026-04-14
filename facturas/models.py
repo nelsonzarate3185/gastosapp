@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 class Factura(models.Model):
 
@@ -12,6 +13,15 @@ class Factura(models.Model):
         ('pagada', 'Pagada'),
         ('vencida', 'Vencida'),
     ]
+
+    # Usuario propietario
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='facturas',
+        null=True,
+        blank=True
+    )
 
     # Imagen original de la factura
     imagen = models.ImageField(upload_to='facturas/', blank=True, null=True)
@@ -56,4 +66,4 @@ class Factura(models.Model):
         ordering = ['-creado']
 
     def __str__(self):
-        return f"{self.nombre_proveedor} | Timbrado: {self.timbrado} | {self.importe_total}"
+        return f"{self.usuario} | {self.nombre_proveedor} | {self.importe_total}"
