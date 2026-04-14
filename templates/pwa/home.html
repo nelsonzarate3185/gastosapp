@@ -2,78 +2,6 @@
 
 {% block content %}
 <style>
-    /* === DASHBOARD === */
-    .dashboard {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        margin-bottom: 24px;
-    }
-    .dash-card {
-        background: white;
-        border-radius: 16px;
-        padding: 16px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        text-align: center;
-    }
-    .dash-card.full { grid-column: 1 / -1; }
-    .dash-card h3 { font-size: 12px; color: #888; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; }
-    .dash-card .valor { font-size: 22px; font-weight: 800; color: #1a73e8; }
-    .dash-card .sub { font-size: 12px; color: #aaa; margin-top: 4px; }
-    .chart-bars {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        height: 80px;
-        gap: 4px;
-        margin-top: 12px;
-    }
-    .bar-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .bar {
-        width: 100%;
-        background: #1a73e8;
-        border-radius: 4px 4px 0 0;
-        min-height: 2px;
-        transition: height 0.3s;
-    }
-    .bar.mes-actual { background: #34a853; }
-    .bar-label { font-size: 9px; color: #aaa; }
-
-    /* === FILTROS === */
-    .filtros-card {
-        background: white;
-        border-radius: 16px;
-        padding: 20px;
-        margin-bottom: 24px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    }
-    .filtros-card h3 { font-size: 15px; font-weight: 700; color: #333; margin-bottom: 16px; }
-    .filtros-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .filtros-grid .full { grid-column: 1 / -1; }
-    .filtro-group label { display: block; font-size: 11px; font-weight: 600; color: #888; margin-bottom: 4px; text-transform: uppercase; }
-    .filtro-group input, .filtro-group select {
-        width: 100%; padding: 9px 12px; border: 1.5px solid #e0e0e0;
-        border-radius: 10px; font-size: 13px; color: #333;
-        box-sizing: border-box;
-    }
-    .filtro-group input:focus, .filtro-group select:focus { outline: none; border-color: #1a73e8; }
-    .btn-filtrar {
-        width: 100%; padding: 12px; background: #1a73e8; color: white;
-        border: none; border-radius: 10px; font-size: 14px;
-        font-weight: 700; cursor: pointer; margin-top: 12px;
-    }
-    .btn-limpiar {
-        width: 100%; padding: 10px; background: #f5f5f5; color: #666;
-        border: none; border-radius: 10px; font-size: 13px;
-        font-weight: 600; cursor: pointer; margin-top: 6px;
-    }
-    .btn-excel {
-        width: 100%; padding: 12px; background: #34a853; color: white;
-        border: none; border-radius: 10px; font-size: 14px;
-        font-weight: 700; cursor: pointer; margin-top: 6px;
-        display: flex; align-items: center; justify-content: center; gap: 8px;
-    }
-
     /* === UPLOAD === */
     .upload-card {
         background: white; border-radius: 16px; padding: 24px;
@@ -161,61 +89,6 @@
     .empty-state span { font-size: 48px; display: block; margin-bottom: 12px; }
 </style>
 
-<!-- DASHBOARD -->
-<div class="dashboard">
-    <div class="dash-card">
-        <h3>Total {{ anio_actual }}</h3>
-        <div class="valor">Gs. {{ total_anual|floatformat:0 }}</div>
-        <div class="sub">Año completo</div>
-    </div>
-    <div class="dash-card">
-        <h3>Este Mes</h3>
-        <div class="valor">Gs. {{ total_mes|floatformat:0 }}</div>
-        <div class="sub">Mes actual</div>
-    </div>
-    <div class="dash-card full">
-        <h3>📊 Evolución mensual {{ anio_actual }}</h3>
-        <div class="chart-bars" id="chartBars"></div>
-    </div>
-</div>
-
-<!-- FILTROS + EXCEL -->
-<div class="filtros-card">
-    <h3>🔍 Buscar Facturas</h3>
-    <form method="GET" action="{% url 'home' %}">
-        <div class="filtros-grid">
-            <div class="filtro-group">
-                <label>Proveedor</label>
-                <input type="text" name="proveedor" value="{{ filtros.proveedor }}" placeholder="Nombre...">
-            </div>
-            <div class="filtro-group">
-                <label>RUC</label>
-                <input type="text" name="ruc" value="{{ filtros.ruc }}" placeholder="RUC...">
-            </div>
-            <div class="filtro-group">
-                <label>Desde</label>
-                <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}">
-            </div>
-            <div class="filtro-group">
-                <label>Hasta</label>
-                <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}">
-            </div>
-            <div class="filtro-group full">
-                <label>Estado</label>
-                <select name="estado">
-                    <option value="">Todos</option>
-                    <option value="pendiente" {% if filtros.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                    <option value="pagada" {% if filtros.estado == 'pagada' %}selected{% endif %}>Pagada</option>
-                    <option value="vencida" {% if filtros.estado == 'vencida' %}selected{% endif %}>Vencida</option>
-                </select>
-            </div>
-        </div>
-        <button type="submit" class="btn-filtrar">🔍 Buscar</button>
-        <a href="{% url 'home' %}" class="btn-limpiar" style="display:block; text-align:center; text-decoration:none;">✖ Limpiar filtros</a>
-    </form>
-    <a href="{% url 'exportar-excel' %}" class="btn-excel">📥 Descargar Excel</a>
-</div>
-
 <!-- UPLOAD -->
 <div class="upload-card" id="cardUpload">
     <h2>📷 Nueva Factura</h2>
@@ -297,7 +170,7 @@
                 </div>
             </div>
             <div class="factura-detail">🗓 {{ f.fecha_emision|default:"Sin fecha" }}</div>
-            <div class="factura-detail">🏷 Timbrado: {{ f.timbrado|default:"-" }}</div>
+            <div class="factura-detail">🔷 Timbrado: {{ f.timbrado|default:"-" }}</div>
             <div class="factura-detail">📋 RUC: {{ f.ruc|default:"-" }}</div>
             <span class="badge badge-{{ f.estado }}">{{ f.get_estado_display }}</span>
             <span class="badge badge-tipo">{{ f.get_tipo_display }}</span>
@@ -306,32 +179,12 @@
     {% else %}
         <div class="empty-state">
             <span>📂</span>
-            <p>No se encontraron facturas.<br>Ajustá los filtros o subí una nueva.</p>
+            <p>No hay facturas cargadas aún.<br>Subí una nueva con el botón de arriba.</p>
         </div>
     {% endif %}
 </div>
 
 <script>
-    // === CHART ===
-    const mesesData = {{ meses_data|safe }};
-    const mesActual = {{ anio_actual }};
-    const hoy = new Date();
-    const mesIdx = hoy.getMonth(); // 0-based
-
-    const maxValor = Math.max(...mesesData.map(m => m.total), 1);
-    const chartBars = document.getElementById('chartBars');
-    mesesData.forEach((m, i) => {
-        const altura = Math.max((m.total / maxValor) * 70, m.total > 0 ? 4 : 2);
-        const esActual = i === mesIdx;
-        chartBars.innerHTML += `
-            <div class="bar-item">
-                <div class="bar ${esActual ? 'mes-actual' : ''}" style="height:${altura}px" title="Gs. ${m.total.toLocaleString()}"></div>
-                <div class="bar-label">${m.mes}</div>
-            </div>
-        `;
-    });
-
-    // === UPLOAD ===
     let tipoSeleccionado = 'electronica';
     let imagenFile = null;
     let textoOcrGuardado = '';

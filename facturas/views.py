@@ -7,16 +7,11 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
-from django.http import HttpResponse
-from django.db.models import Sum, Q
-from django.utils import timezone
+from django.db.models import Q
 from .models import Factura
 from .serializers import FacturaSerializer
 import requests
 import re
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment
-from datetime import date
 
 
 def ocr_con_api(imagen):
@@ -149,7 +144,6 @@ class FacturaConfirmarView(APIView):
 
     def post(self, request):
         data = request.data.copy()
-        # Asignar usuario autenticado
         if request.user.is_authenticated:
             data['usuario'] = request.user.id
         serializer = FacturaSerializer(data=data)
@@ -209,112 +203,8 @@ def logout_view(request):
 
 @login_required(login_url='login')
 def home_view(request):
-    # Filtros de búsqueda
-    qs = Factura.objects.filter(usuario=request.user)
-    q_ruc = request.GET.get('ruc', '')
-    q_proveedor = request.GET.get('proveedor', '')
-    q_fecha_desde = request.GET.get('fecha_desde', '')
-    q_fecha_hasta = request.GET.get('fecha_hasta', '')
-    q_estado = request.GET.get('estado', '')
-
-    if q_ruc:
-        qs = qs.filter(ruc__icontains=q_ruc)
-    if q_proveedor:
-        qs = qs.filter(nombre_proveedor__icontains=q_proveedor)
-    if q_fecha_desde:
-        qs = qs.filter(fecha_emision__gte=q_fecha_desde)
-    if q_fecha_hasta:
-        qs = qs.filter(fecha_emision__lte=q_fecha_hasta)
-    if q_estado:
-        qs = qs.filter(estado=q_estado)
-
-    facturas = qs[:50]
-
-    # Dashboard - totales
-    anio_actual = timezone.now().year
-    mes_actual = timezone.now().month
-
-    total_anual = Factura.objects.filter(
-        usuario=request.user,
-        fecha_emision__year=anio_actual
-    ).aggregate(total=Sum('importe_total'))['total'] or 0
-
-    total_mes = Factura.objects.filter(
-        usuario=request.user,
-        fecha_emision__year=anio_actual,
-        fecha_emision__month=mes_actual
-    ).aggregate(total=Sum('importe_total'))['total'] or 0
-
-    # Totales por mes del año actual
-    meses_data = []
-    nombres_meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-    for m in range(1, 13):
-        total_m = Factura.objects.filter(
-            usuario=request.user,
-            fecha_emision__year=anio_actual,
-            fecha_emision__month=m
-        ).aggregate(total=Sum('importe_total'))['total'] or 0
-        meses_data.append({'mes': nombres_meses[m-1], 'total': float(total_m)})
-
+    facturas = Factura.objects.filter(usuario=request.user).order_by('-creado')[:50]
     context = {
         'facturas': facturas,
-        'total_anual': total_anual,
-        'total_mes': total_mes,
-        'meses_data': meses_data,
-        'anio_actual': anio_actual,
-        'filtros': {
-            'ruc': q_ruc,
-            'proveedor': q_proveedor,
-            'fecha_desde': q_fecha_desde,
-            'fecha_hasta': q_fecha_hasta,
-            'estado': q_estado,
-        }
     }
     return render(request, 'pwa/home.html', context)
-
-
-@login_required(login_url='login')
-def exportar_excel(request):
-    facturas = Factura.objects.filter(usuario=request.user).order_by('-fecha_emision')
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = 'Facturas'
-
-    # Estilos
-    header_font = Font(bold=True, color='FFFFFF')
-    header_fill = PatternFill(start_color='1a73e8', end_color='1a73e8', fill_type='solid')
-    header_align = Alignment(horizontal='center')
-
-    # Encabezados
-    headers = ['ID', 'Proveedor', 'RUC', 'Timbrado', 'Fecha Emisión', 'Importe Total', 'Tipo', 'Estado', 'Notas', 'Creado']
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_align
-
-    # Datos
-    for row, f in enumerate(facturas, 2):
-        ws.cell(row=row, column=1, value=f.id)
-        ws.cell(row=row, column=2, value=f.nombre_proveedor)
-        ws.cell(row=row, column=3, value=f.ruc)
-        ws.cell(row=row, column=4, value=f.timbrado)
-        ws.cell(row=row, column=5, value=str(f.fecha_emision) if f.fecha_emision else '')
-        ws.cell(row=row, column=6, value=float(f.importe_total) if f.importe_total else 0)
-        ws.cell(row=row, column=7, value=f.get_tipo_display())
-        ws.cell(row=row, column=8, value=f.get_estado_display())
-        ws.cell(row=row, column=9, value=f.notas)
-        ws.cell(row=row, column=10, value=str(f.creado.strftime('%d/%m/%Y %H:%M')))
-
-    # Ancho de columnas
-    anchos = [8, 30, 15, 15, 15, 18, 20, 15, 25, 18]
-    for col, ancho in enumerate(anchos, 1):
-        ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = ancho
-
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = f'attachment; filename="facturas_{request.user.username}_{timezone.now().strftime("%Y%m%d")}.xlsx"'
-    wb.save(response)
-    return response

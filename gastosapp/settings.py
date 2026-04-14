@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',  # 
     'rest_framework',  # Django REST Framework
     'facturas',        # Nuestra app
 ]
