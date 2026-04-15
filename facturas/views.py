@@ -1,3 +1,5 @@
+# facturas/views.py
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -5,14 +7,21 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
-from django.db.models import Q
-from .models import Factura
-from .serializers import FacturaSerializer
+from django.db.models import Sum, Q
+from django.utils import timezone
+from .models import Factura, Ingreso
+from .serializers import FacturaSerializer, IngresoSerializer, UsuarioSerializer
 import requests
 import re
+from django.db.models.functions import TruncMonth
 
+
+# ══════════════════════════════════════════════════════
+# OCR - Sin cambios en la lógica, solo se mantiene
+# ══════════════════════════════════════════════════════
 
 def ocr_con_api(imagen):
     api_key = settings.OCR_API_KEY
@@ -117,35 +126,64 @@ def extraer_datos_ocr(texto):
             mes = meses[fecha_escrita.group(2)]
             anio = fecha_escrita.group(3)
             try:
-                datos['fecha_emision'] = datetime.strptime(f"{dia}/{mes}/{anio}", '%d/%m/%Y').date()
+                datos['fecha_emision'] = datetime.strptime(
+                    f"{dia}/{mes}/{anio}", '%d/%m/%Y'
+                ).date()
             except ValueError:
                 pass
 
     return datos
 
 
+# ══════════════════════════════════════════════════════
+# FACTURAS - ENDPOINTS API
+# ══════════════════════════════════════════════════════
+
 class FacturaUploadView(APIView):
+    """Procesa imagen con OCR y devuelve datos extraídos (sin guardar)."""
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
         imagen = request.FILES.get('imagen')
         if not imagen:
-            return Response({'error': 'No se recibió ninguna imagen.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'No se recibió ninguna imagen.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         try:
             texto = ocr_con_api(imagen)
             datos = extraer_datos_ocr(texto)
-            return Response({'texto_ocr': texto, 'datos_extraidos': datos}, status=status.HTTP_200_OK)
+            return Response(
+                {'texto_ocr': texto, 'datos_extraidos': datos},
+                status=status.HTTP_200_OK
+            )
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class FacturaConfirmarView(APIView):
+    """
+    Guarda la factura en la DB.
+    - Si viene usuario en el body, lo usa (admin puede asignar a otro usuario).
+    - Si no viene, asigna el usuario logueado.
+    - Si carga_manual=true, no requiere imagen.
+    """
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
         data = request.data.copy()
-        if request.user.is_authenticated:
+
+        # Asignar usuario: usa el del body si existe, sino el logueado
+        if not data.get('usuario') and request.user.is_authenticated:
             data['usuario'] = request.user.id
+
+        # Marcar como carga manual si no hay imagen
+        if not request.FILES.get('imagen'):
+            data['carga_manual'] = True
+
         serializer = FacturaSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -154,20 +192,28 @@ class FacturaConfirmarView(APIView):
 
 
 class FacturaListView(APIView):
+    """Lista facturas del usuario logueado."""
+
     def get(self, request):
-        facturas = Factura.objects.filter(usuario=request.user)
+        facturas = Factura.objects.filter(
+            usuario=request.user
+        ).select_related('usuario')
         serializer = FacturaSerializer(facturas, many=True)
         return Response(serializer.data)
 
 
 class FacturaDetailView(APIView):
+    """Obtiene o edita una factura específica."""
+
     def get(self, request, pk):
         try:
             factura = Factura.objects.get(pk=pk, usuario=request.user)
-            serializer = FacturaSerializer(factura)
-            return Response(serializer.data)
+            return Response(FacturaSerializer(factura).data)
         except Factura.DoesNotExist:
-            return Response({'error': 'Factura no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {'error': 'Factura no encontrada.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
     def patch(self, request, pk):
         try:
@@ -178,8 +224,185 @@ class FacturaDetailView(APIView):
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Factura.DoesNotExist:
-            return Response({'error': 'Factura no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {'error': 'Factura no encontrada.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
+    def delete(self, request, pk):
+        try:
+            factura = Factura.objects.get(pk=pk, usuario=request.user)
+            factura.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Factura.DoesNotExist:
+            return Response(
+                {'error': 'Factura no encontrada.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+# ══════════════════════════════════════════════════════
+# INGRESOS - ENDPOINTS API  ✅ NUEVO
+# ══════════════════════════════════════════════════════
+
+class IngresoListCreateView(APIView):
+    """Lista y crea ingresos del usuario logueado."""
+
+    def get(self, request):
+        ingresos = Ingreso.objects.filter(
+            usuario=request.user
+        ).select_related('usuario')
+        serializer = IngresoSerializer(ingresos, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        data = request.data.copy()
+        data['usuario'] = request.user.id
+        serializer = IngresoSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class IngresoDetailView(APIView):
+    """Obtiene, edita o elimina un ingreso específico."""
+
+    def _get_ingreso(self, pk, user):
+        try:
+            return Ingreso.objects.get(pk=pk, usuario=user)
+        except Ingreso.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        ingreso = self._get_ingreso(pk, request.user)
+        if not ingreso:
+            return Response(
+                {'error': 'Ingreso no encontrado.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        return Response(IngresoSerializer(ingreso).data)
+
+    def patch(self, request, pk):
+        ingreso = self._get_ingreso(pk, request.user)
+        if not ingreso:
+            return Response(
+                {'error': 'Ingreso no encontrado.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        serializer = IngresoSerializer(ingreso, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        ingreso = self._get_ingreso(pk, request.user)
+        if not ingreso:
+            return Response(
+                {'error': 'Ingreso no encontrado.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        ingreso.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ══════════════════════════════════════════════════════
+# DASHBOARD - RESUMEN FINANCIERO  ✅ NUEVO
+# ══════════════════════════════════════════════════════
+
+class DashboardView(APIView):
+    """
+    Retorna resumen financiero del usuario:
+    - Balance mensual (ingresos - egresos del mes actual)
+    - Totales anuales de ingresos y egresos
+    - Últimas facturas e ingresos
+    """
+
+    def get(self, request):
+        hoy = timezone.now().date()
+        mes_actual = hoy.month
+        anio_actual = hoy.year
+
+        usuario = request.user
+
+        # ── Egresos (facturas) ───────────────────────────────────────────────
+        egresos_mes = Factura.objects.filter(
+            usuario=usuario,
+            fecha_emision__year=anio_actual,
+            fecha_emision__month=mes_actual,
+        ).aggregate(total=Sum('importe_total'))['total'] or 0
+
+        egresos_anio = Factura.objects.filter(
+            usuario=usuario,
+            fecha_emision__year=anio_actual,
+        ).aggregate(total=Sum('importe_total'))['total'] or 0
+
+        # ── Ingresos ─────────────────────────────────────────────────────────
+        ingresos_mes = Ingreso.objects.filter(
+            usuario=usuario,
+            fecha__year=anio_actual,
+            fecha__month=mes_actual,
+        ).aggregate(total=Sum('monto'))['total'] or 0
+
+        ingresos_anio = Ingreso.objects.filter(
+            usuario=usuario,
+            fecha__year=anio_actual,
+        ).aggregate(total=Sum('monto'))['total'] or 0
+
+        # ── Balance ──────────────────────────────────────────────────────────
+        balance_mes = ingresos_mes - egresos_mes
+        balance_anio = ingresos_anio - egresos_anio
+
+        # ── Últimos registros ─────────────────────────────────────────────────
+        ultimas_facturas = Factura.objects.filter(
+            usuario=usuario
+        ).order_by('-creado')[:5]
+
+        ultimos_ingresos = Ingreso.objects.filter(
+            usuario=usuario
+        ).order_by('-creado')[:5]
+
+        return Response({
+            'periodo': {
+                'mes': mes_actual,
+                'anio': anio_actual,
+            },
+            'mensual': {
+                'ingresos': float(ingresos_mes),
+                'egresos': float(egresos_mes),
+                'balance': float(balance_mes),
+            },
+            'anual': {
+                'ingresos': float(ingresos_anio),
+                'egresos': float(egresos_anio),
+                'balance': float(balance_anio),
+            },
+            'ultimas_facturas': FacturaSerializer(
+                ultimas_facturas, many=True
+            ).data,
+            'ultimos_ingresos': IngresoSerializer(
+                ultimos_ingresos, many=True
+            ).data,
+        })
+
+
+# ══════════════════════════════════════════════════════
+# USUARIOS - Endpoint para selector de usuario
+# ══════════════════════════════════════════════════════
+
+class UsuarioListView(APIView):
+    """Lista usuarios disponibles para asignar a una factura."""
+
+    def get(self, request):
+        usuarios = User.objects.filter(is_active=True).order_by('username')
+        serializer = UsuarioSerializer(usuarios, many=True)
+        return Response(serializer.data)
+
+
+# ══════════════════════════════════════════════════════
+# VISTAS DJANGO (HTML/PWA) - Sin cambios estructurales
+# ══════════════════════════════════════════════════════
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -203,8 +426,106 @@ def logout_view(request):
 
 @login_required(login_url='login')
 def home_view(request):
-    facturas = Factura.objects.filter(usuario=request.user).order_by('-creado')[:50]
-    context = {
-        'facturas': facturas,
-    }
+    facturas = Factura.objects.filter(
+        usuario=request.user
+    ).order_by('-creado')[:50]
+    context = {'facturas': facturas}
     return render(request, 'pwa/home.html', context)
+
+@login_required(login_url='login')
+def reporte_view(request):
+    """Vista HTML para la página de reportería."""
+    return render(request, 'pwa/reporte.html')
+
+class ReporteDashboardView(APIView):
+    """
+    Dashboard con filtro por usuario.
+    Parámetros GET:
+      - usuario_id: int (opcional, solo admin)
+      - anio: int (opcional, default año actual)
+    """
+
+    def get(self, request):
+        from django.db.models.functions import ExtractMonth
+        import calendar
+
+        anio = int(request.GET.get('anio', timezone.now().year))
+
+        # Determinar qué usuario filtrar
+        # Si es superuser puede ver cualquier usuario
+        usuario_id = request.GET.get('usuario_id')
+        if usuario_id and request.user.is_superuser:
+            try:
+                usuario_filtro = User.objects.get(pk=usuario_id)
+            except User.DoesNotExist:
+                usuario_filtro = request.user
+        else:
+            usuario_filtro = request.user
+
+        meses_nombres = [
+            'Ene','Feb','Mar','Abr','May','Jun',
+            'Jul','Ago','Sep','Oct','Nov','Dic'
+        ]
+
+        # Construir tabla mensual
+        mensual = []
+        total_ing = 0
+        total_egr = 0
+
+        for mes in range(1, 13):
+            ing = Ingreso.objects.filter(
+                usuario=usuario_filtro,
+                fecha__year=anio,
+                fecha__month=mes,
+            ).aggregate(t=Sum('monto'))['t'] or 0
+
+            egr = Factura.objects.filter(
+                usuario=usuario_filtro,
+                fecha_emision__year=anio,
+                fecha_emision__month=mes,
+            ).aggregate(t=Sum('importe_total'))['t'] or 0
+
+            total_ing += float(ing)
+            total_egr += float(egr)
+
+            mensual.append({
+                'mes': mes,
+                'nombre': meses_nombres[mes - 1],
+                'ingresos': float(ing),
+                'egresos': float(egr),
+                'balance': float(ing) - float(egr),
+            })
+
+        # Totales generales
+        mes_actual = timezone.now().month
+        ing_mes = Ingreso.objects.filter(
+            usuario=usuario_filtro,
+            fecha__year=anio,
+            fecha__month=mes_actual,
+        ).aggregate(t=Sum('monto'))['t'] or 0
+
+        egr_mes = Factura.objects.filter(
+            usuario=usuario_filtro,
+            fecha_emision__year=anio,
+            fecha_emision__month=mes_actual,
+        ).aggregate(t=Sum('importe_total'))['t'] or 0
+
+        return Response({
+            'usuario': {
+                'id': usuario_filtro.id,
+                'username': usuario_filtro.username,
+                'nombre': usuario_filtro.get_full_name() or usuario_filtro.username,
+            },
+            'anio': anio,
+            'mes_actual': mes_actual,
+            'mensual': mensual,
+            'resumen': {
+                'ingresos_mes':  float(ing_mes),
+                'egresos_mes':   float(egr_mes),
+                'balance_mes':   float(ing_mes) - float(egr_mes),
+                'ingresos_anio': total_ing,
+                'egresos_anio':  total_egr,
+                'balance_anio':  total_ing - total_egr,
+            },
+        })
+

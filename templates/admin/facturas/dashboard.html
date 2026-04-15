@@ -1,4 +1,5 @@
 {% extends "admin/base_site.html" %}
+{% load humanize %}
 
 {% block title %}Dashboard de Facturas{% endblock %}
 
@@ -6,105 +7,106 @@
 <style>
   .dashboard-container { padding: 20px; }
 
-  /* ── Tarjetas resumen ── */
+  .btn-volver {
+    display: inline-block; margin-bottom: 20px; padding: 8px 16px;
+    background: #1a73e8; color: #fff; border-radius: 6px;
+    text-decoration: none; font-size: 13px;
+  }
+  .btn-volver:hover { background: #1557b0; color: #fff; }
+
+  /* Filtro usuario */
+  .filtro-usuario {
+    background: #fff; border-radius: 10px; padding: 16px 20px;
+    margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .filtro-usuario label { font-weight: 600; font-size: 13px; color: #555; }
+  .filtro-usuario select {
+    padding: 8px 12px; border: 1.5px solid #e0e0e0; border-radius: 8px;
+    font-size: 13px; color: #333; min-width: 200px;
+  }
+  .filtro-usuario select:focus { outline: none; border-color: #1a73e8; }
+  .btn-filtrar {
+    padding: 8px 16px; background: #1a73e8; color: #fff;
+    border: none; border-radius: 8px; font-size: 13px;
+    font-weight: 600; cursor: pointer; text-decoration: none;
+  }
+  .btn-filtrar:hover { background: #1557b0; }
+  .btn-excel-dash {
+    padding: 8px 16px; background: #34a853; color: #fff;
+    border: none; border-radius: 8px; font-size: 13px;
+    font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block;
+  }
+  .btn-excel-dash:hover { background: #2d8f47; color: #fff; }
+  .badge-usuario {
+    background: #e8f0fe; color: #1a73e8; padding: 4px 12px;
+    border-radius: 20px; font-size: 13px; font-weight: 600;
+  }
+
+  /* Tarjetas */
   .cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-    margin-bottom: 30px;
+    gap: 16px; margin-bottom: 30px;
   }
   .card {
-    background: #fff;
-    border-radius: 10px;
-    padding: 20px;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: #fff; border-radius: 10px; padding: 20px;
+    text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     border-top: 4px solid #1a73e8;
   }
   .card.verde  { border-top-color: #34a853; }
   .card.rojo   { border-top-color: #ea4335; }
   .card.naranja{ border-top-color: #fbbc04; }
   .card.azul   { border-top-color: #1a73e8; }
-  .card h3 { margin: 0 0 8px; font-size: 13px; color: #666; text-transform: uppercase; }
+  .card h3 { margin: 0 0 8px; font-size: 12px; color: #666; text-transform: uppercase; }
   .card .valor { font-size: 28px; font-weight: bold; color: #333; }
   .card .sub   { font-size: 12px; color: #999; margin-top: 4px; }
 
-  /* ── Gráficos ── */
+  /* Gráficos */
   .charts-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 20px;
-    margin-bottom: 30px;
+    display: grid; grid-template-columns: 2fr 1fr;
+    gap: 20px; margin-bottom: 30px;
   }
   .chart-box {
-    background: #fff;
-    border-radius: 10px;
-    padding: 20px;
+    background: #fff; border-radius: 10px; padding: 20px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   }
   .chart-box h3 {
-    margin: 0 0 16px;
-    font-size: 15px;
-    color: #333;
-    border-bottom: 2px solid #1a73e8;
-    padding-bottom: 8px;
+    margin: 0 0 16px; font-size: 15px; color: #333;
+    border-bottom: 2px solid #1a73e8; padding-bottom: 8px;
   }
 
-  /* ── Tablas ── */
+  /* Tablas */
   .tables-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 30px;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 20px; margin-bottom: 30px;
   }
   .table-box {
-    background: #fff;
-    border-radius: 10px;
-    padding: 20px;
+    background: #fff; border-radius: 10px; padding: 20px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   }
+  .table-box.full { grid-column: 1 / -1; }
   .table-box h3 {
-    margin: 0 0 16px;
-    font-size: 15px;
-    color: #333;
-    border-bottom: 2px solid #1a73e8;
-    padding-bottom: 8px;
+    margin: 0 0 16px; font-size: 15px; color: #333;
+    border-bottom: 2px solid #1a73e8; padding-bottom: 8px;
   }
-  .table-box table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
+  .table-box table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .table-box th {
-    background: #f1f3f4;
-    padding: 8px 10px;
-    text-align: left;
-    font-weight: 600;
-    color: #555;
+    background: #f1f3f4; padding: 8px 10px;
+    text-align: left; font-weight: 600; color: #555;
   }
-  .table-box td {
-    padding: 8px 10px;
-    border-bottom: 1px solid #f0f0f0;
-    color: #333;
-  }
+  .table-box td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; color: #333; }
   .table-box tr:hover td { background: #f8f9fa; }
   .importe { text-align: right; font-weight: 600; color: #1a73e8; }
-
-  /* ── Botón volver ── */
-  .btn-volver {
-    display: inline-block;
-    margin-bottom: 20px;
-    padding: 8px 16px;
-    background: #1a73e8;
-    color: #fff;
-    border-radius: 6px;
-    text-decoration: none;
-    font-size: 13px;
+  .btn-ver-usuario {
+    font-size: 11px; padding: 3px 8px; background: #e8f0fe;
+    color: #1a73e8; border-radius: 4px; text-decoration: none; font-weight: 600;
   }
-  .btn-volver:hover { background: #1557b0; color: #fff; }
+  .btn-ver-usuario:hover { background: #1a73e8; color: #fff; }
 
   @media (max-width: 768px) {
     .charts-grid, .tables-grid { grid-template-columns: 1fr; }
+    .table-box.full { grid-column: 1; }
   }
 </style>
 {% endblock %}
@@ -113,29 +115,56 @@
 <div class="dashboard-container">
 
   <a href="/admin/facturas/factura/" class="btn-volver">← Volver al listado</a>
-  <h1>📊 Dashboard de Facturas</h1>
+  <h1>📊 Dashboard de Facturas
+    {% if usuario_seleccionado %}
+      — <span class="badge-usuario">👤 {{ usuario_seleccionado.get_full_name|default:usuario_seleccionado.username }}</span>
+    {% endif %}
+  </h1>
 
-  <!-- ── TARJETAS ── -->
+  <!-- FILTRO POR USUARIO -->
+  <div class="filtro-usuario">
+    <label>👤 Filtrar por usuario:</label>
+    <form method="GET" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <select name="usuario">
+        <option value="">— Todos los usuarios —</option>
+        {% for u in usuarios %}
+          <option value="{{ u.pk }}" {% if usuario_id == u.pk|stringformat:"s" %}selected{% endif %}>
+            {{ u.get_full_name|default:u.username }} ({{ u.username }})
+          </option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-filtrar">🔍 Filtrar</button>
+      {% if usuario_id %}
+        <a href="/admin/facturas/factura/dashboard/" class="btn-filtrar" style="background:#666;">✖ Limpiar</a>
+      {% endif %}
+    </form>
+    <!-- Botón Excel filtrado -->
+    <a href="/admin/facturas/factura/dashboard/excel/?usuario={{ usuario_id }}" class="btn-excel-dash">
+      📥 Descargar Excel {% if usuario_seleccionado %}({{ usuario_seleccionado.username }}){% else %}(todos){% endif %}
+    </a>
+  </div>
+
+  <!-- TARJETAS -->
   <div class="cards-grid">
     <div class="card azul">
       <h3>Total Facturas</h3>
       <div class="valor">{{ total_facturas }}</div>
-      <div class="sub">registradas en el sistema</div>
+      <div class="sub">{% if usuario_seleccionado %}de {{ usuario_seleccionado.username }}{% else %}todos los usuarios{% endif %}</div>
     </div>
     <div class="card verde">
       <h3>Importe Total</h3>
       <div class="valor">₲ {{ total_importe|floatformat:0 }}</div>
-      <div class="sub">suma de todas las facturas</div>
+      <div class="sub">suma total</div>
     </div>
     <div class="card naranja">
       <h3>Pendientes</h3>
       <div class="valor">{{ pendientes }}</div>
-      <div class="sub">facturas sin pagar</div>
+      <div class="sub">sin pagar</div>
     </div>
     <div class="card verde">
       <h3>Pagadas</h3>
       <div class="valor">{{ pagadas }}</div>
-      <div class="sub">facturas abonadas</div>
+      <div class="sub">abonadas</div>
     </div>
     <div class="card rojo">
       <h3>Vencidas</h3>
@@ -144,7 +173,7 @@
     </div>
   </div>
 
-  <!-- ── GRÁFICOS ── -->
+  <!-- GRÁFICOS -->
   <div class="charts-grid">
     <div class="chart-box">
       <h3>📈 Importes mensuales — {{ anio_actual }}</h3>
@@ -156,7 +185,7 @@
     </div>
   </div>
 
-  <!-- ── TABLAS ── -->
+  <!-- TABLAS -->
   <div class="tables-grid">
 
     <!-- Resumen Anual -->
@@ -209,14 +238,51 @@
       </table>
     </div>
 
+    <!-- Resumen por usuario (solo si no hay filtro) -->
+    {% if resumen_usuarios %}
+    <div class="table-box full">
+      <h3>👥 Resumen por Usuario</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Cantidad</th>
+            <th class="importe">Importe Total (₲)</th>
+            <th style="text-align:center;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in resumen_usuarios %}
+          <tr>
+            <td>
+              {% if item.usuario__first_name %}
+                {{ item.usuario__first_name }} {{ item.usuario__last_name }}
+                <small style="color:#999;">({{ item.usuario__username }})</small>
+              {% else %}
+                {{ item.usuario__username|default:"Sin usuario" }}
+              {% endif %}
+            </td>
+            <td>{{ item.cantidad }}</td>
+            <td class="importe">{{ item.total|floatformat:0 }}</td>
+            <td style="text-align:center;">
+              {% if item.usuario__username %}
+              <a href="?usuario={% for u in usuarios %}{% if u.username == item.usuario__username %}{{ u.pk }}{% endif %}{% endfor %}"
+                 class="btn-ver-usuario">🔍 Ver</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
   </div>
 
 </div>
 
-<!-- ── CHART.JS ── -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // Gráfico mensual (barras)
   const ctxMensual = document.getElementById('graficoMensual').getContext('2d');
   new Chart(ctxMensual, {
     type: 'bar',
@@ -227,8 +293,7 @@
         data: {{ meses_valores|safe }},
         backgroundColor: 'rgba(26, 115, 232, 0.7)',
         borderColor: 'rgba(26, 115, 232, 1)',
-        borderWidth: 1,
-        borderRadius: 4,
+        borderWidth: 1, borderRadius: 4,
       }]
     },
     options: {
@@ -237,15 +302,12 @@
       scales: {
         y: {
           beginAtZero: true,
-          ticks: {
-            callback: v => '₲ ' + v.toLocaleString()
-          }
+          ticks: { callback: v => '₲ ' + v.toLocaleString() }
         }
       }
     }
   });
 
-  // Gráfico estado (dona)
   const ctxEstado = document.getElementById('graficoEstado').getContext('2d');
   new Chart(ctxEstado, {
     type: 'doughnut',
@@ -259,9 +321,7 @@
     },
     options: {
       responsive: true,
-      plugins: {
-        legend: { position: 'bottom' }
-      }
+      plugins: { legend: { position: 'bottom' } }
     }
   });
 </script>
