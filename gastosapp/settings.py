@@ -1,16 +1,24 @@
 from pathlib import Path
 from decouple import config
 import os
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='clave-secreta-local-cambiar-en-produccion')
-
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1'
+).split(',')
 
-# Aplicaciones instaladas
+# ✅ CSRF para Safari iOS y Render
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost:8000,http://127.0.0.1:8000'
+).split(',')
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -18,14 +26,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.humanize',  # 
-    'rest_framework',  # Django REST Framework
-    'facturas',        # Nuestra app
+    'django.contrib.humanize',
+    'rest_framework',
+    'facturas',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Para archivos estáticos
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -54,14 +62,14 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'gastosapp.wsgi.application'
 
-# Base de datos
-import dj_database_url
-
+# ── Base de datos ─────────────────────────────────────────────────────────────
 DATABASE_URL = config('DATABASE_URL', default=None)
-
 if DATABASE_URL:
     DATABASES = {
-        'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600
+        )
     }
 else:
     DATABASES = {
@@ -71,7 +79,7 @@ else:
         }
     }
 
-# Contraseñas
+# ── Contraseñas ───────────────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -79,23 +87,32 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+# ── Localización ──────────────────────────────────────────────────────────────
 LANGUAGE_CODE = 'es-ar'
 TIME_ZONE = 'America/Argentina/Buenos_Aires'
 USE_I18N = True
 USE_TZ = True
 
-# Archivos estáticos
+# ── Archivos estáticos ────────────────────────────────────────────────────────
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Archivos de media (imágenes de facturas)
+# ── Media (imágenes de facturas) ──────────────────────────────────────────────
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# ── Límite de uploads (10MB) ──────────────────────────────────────────────────
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE  = 10 * 1024 * 1024   # 10 MB
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Tesseract
-TESSERACT_CMD = config('TESSERACT_CMD', default=r'C:\Program Files\Tesseract-OCR\tesseract.exe')
+# ── Tesseract OCR ─────────────────────────────────────────────────────────────
+TESSERACT_CMD = config(
+    'TESSERACT_CMD',
+    default=r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+)
 
-OCR_API_KEY = config('K85707288288957', default='helloworld')
+# ✅ OCR API KEY corregido
+OCR_API_KEY = config('OCR_API_KEY', default='helloworld')
