@@ -1,39 +1,68 @@
 {% extends 'pwa/base.html' %}
 {% block content %}
 <style>
-/* ══════════════════════════════════════
+/* ═══════════════════════════════════════
+   TABS PRINCIPALES
+═══════════════════════════════════════ */
+.page-tabs {
+    display:flex; gap:8px; margin-bottom:20px;
+    background:white; border-radius:14px; padding:6px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.06);
+}
+.page-tab-btn {
+    flex:1; padding:10px 6px; border:none; border-radius:10px;
+    background:transparent; font-size:12px; font-weight:600;
+    color:#888; cursor:pointer; transition:all 0.2s;
+}
+.page-tab-btn.active { background:#1a73e8; color:white; }
+
+/* ═══════════════════════════════════════
    FILTROS
-══════════════════════════════════════ */
+═══════════════════════════════════════ */
 .filtros-card {
     background:white; border-radius:14px; padding:16px;
-    margin-bottom:16px; box-shadow:0 2px 10px rgba(0,0,0,0.07);
+    margin-bottom:14px; box-shadow:0 2px 10px rgba(0,0,0,0.07);
 }
-.filtros-card h2 { font-size:15px; font-weight:700; color:#333; margin-bottom:12px; }
-.filtros-row { display:flex; gap:10px; align-items:flex-end; }
-.filtro-group { flex:1; }
+.filtros-card h2 { font-size:14px; font-weight:700; color:#333; margin-bottom:12px; }
+.filtros-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;
+}
+.filtros-grid.full { grid-template-columns:1fr; }
 .filtro-group label {
     display:block; font-size:11px; font-weight:600;
-    color:#666; margin-bottom:5px; text-transform:uppercase;
+    color:#666; margin-bottom:4px; text-transform:uppercase;
 }
-.filtro-group select, .filtro-group input {
-    width:100%; padding:10px 12px; border:1.5px solid #e0e0e0;
-    border-radius:10px; font-size:14px; color:#333;
+.filtro-group input,
+.filtro-group select {
+    width:100%; padding:9px 12px; border:1.5px solid #e0e0e0;
+    border-radius:10px; font-size:13px; color:#333;
     background:white; box-sizing:border-box;
 }
+.filtro-group input:focus,
+.filtro-group select:focus { outline:none; border-color:#1a73e8; }
+.filtros-acciones { display:flex; gap:8px; }
 .btn-filtrar {
-    padding:10px 16px; background:#1a73e8; color:white;
+    flex:1; padding:10px; background:#1a73e8; color:white;
     border:none; border-radius:10px; font-size:13px;
+    font-weight:700; cursor:pointer;
+}
+.btn-limpiar {
+    padding:10px 14px; background:#f5f5f5; color:#666;
+    border:none; border-radius:10px; font-size:13px;
+    font-weight:600; cursor:pointer;
+}
+.btn-excel {
+    padding:10px 14px; background:#e6f4ea; color:#137333;
+    border:1.5px solid #a8d5b5; border-radius:10px; font-size:13px;
     font-weight:700; cursor:pointer; white-space:nowrap;
 }
 
-/* ══════════════════════════════════════
-   CARDS DE RESUMEN
-══════════════════════════════════════ */
-.resumen-header {
-    font-size:13px; color:#888; margin-bottom:10px; font-weight:600;
-}
+/* ═══════════════════════════════════════
+   CARDS RESUMEN FINANCIERO
+═══════════════════════════════════════ */
+.resumen-header { font-size:13px; color:#888; margin-bottom:10px; font-weight:600; }
 .dash-grid {
-    display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;
+    display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;
 }
 .dash-card {
     background:white; border-radius:14px; padding:14px;
@@ -47,53 +76,57 @@
 .dash-card .val { font-size:17px; font-weight:800; }
 .dash-card .val.pos { color:#34a853; }
 .dash-card .val.neg { color:#ea4335; }
-.dash-card .val.neu { color:#1a73e8; }
 .dash-card .sub { font-size:11px; color:#bbb; margin-top:3px; }
 .balance-card {
-    grid-column:1/-1;
-    background:linear-gradient(135deg,#1a73e8,#0d47a1);
-    color:white; border-radius:14px; padding:18px;
+    grid-column:1/-1; border-radius:14px; padding:18px;
+    background:linear-gradient(135deg,#1a73e8,#0d47a1); color:white;
     box-shadow:0 4px 14px rgba(26,115,232,0.3);
-    text-align:center; margin-bottom:16px;
+    text-align:center; margin-bottom:14px;
 }
 .balance-card .lbl { font-size:11px; color:rgba(255,255,255,0.7); margin-bottom:6px; }
 .balance-card .val { font-size:26px; font-weight:800; }
 .balance-card .sub { font-size:12px; color:rgba(255,255,255,0.6); margin-top:4px; }
 
-/* ══════════════════════════════════════
-   TABLA MENSUAL
-══════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   TABLA GENÉRICA
+═══════════════════════════════════════ */
 .tabla-card {
     background:white; border-radius:14px; padding:16px;
-    box-shadow:0 2px 10px rgba(0,0,0,0.07); margin-bottom:16px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.07); margin-bottom:14px;
     overflow-x:auto;
 }
-.tabla-card h3 { font-size:14px; font-weight:700; color:#333; margin-bottom:14px; }
-table { width:100%; border-collapse:collapse; font-size:13px; min-width:320px; }
+.tabla-card h3 { font-size:14px; font-weight:700; color:#333; margin-bottom:12px; }
+table { width:100%; border-collapse:collapse; font-size:12px; min-width:340px; }
 thead th {
     text-align:left; padding:8px 10px;
-    background:#f8f9fa; color:#666; font-size:11px;
+    background:#f8f9fa; color:#555; font-size:11px;
     font-weight:700; text-transform:uppercase; letter-spacing:0.4px;
-    border-bottom:2px solid #e0e0e0;
+    border-bottom:2px solid #e0e0e0; white-space:nowrap;
 }
 tbody tr { border-bottom:1px solid #f0f0f0; transition:background 0.15s; }
 tbody tr:hover { background:#fafafa; }
 tbody tr.mes-actual { background:#e8f0fe; font-weight:700; }
-tbody tr.total-row { background:#f8f9fa; font-weight:800; border-top:2px solid #e0e0e0; }
-tbody td { padding:9px 10px; color:#444; }
+tbody tr.total-row  { background:#f8f9fa; font-weight:800; border-top:2px solid #ddd; }
+tbody td { padding:8px 10px; color:#444; vertical-align:middle; }
 td.positivo { color:#34a853; font-weight:700; }
 td.negativo { color:#ea4335; font-weight:700; }
 td.neutro   { color:#1a73e8; font-weight:700; }
 td.cero     { color:#bbb; }
+.badge-tipo-e  { background:#e8f0fe; color:#1a73e8; }
+.badge-tipo-ne { background:#fff8e1; color:#f57f17; }
+.badge-sm {
+    display:inline-block; padding:2px 7px; border-radius:20px;
+    font-size:10px; font-weight:700;
+}
 
-/* ══════════════════════════════════════
-   GRÁFICO DE BARRAS
-══════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   GRÁFICO BARRAS
+═══════════════════════════════════════ */
 .grafico-card {
     background:white; border-radius:14px; padding:16px;
-    box-shadow:0 2px 10px rgba(0,0,0,0.07); margin-bottom:16px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.07); margin-bottom:14px;
 }
-.grafico-card h3 { font-size:14px; font-weight:700; color:#333; margin-bottom:16px; }
+.grafico-card h3 { font-size:14px; font-weight:700; color:#333; margin-bottom:14px; }
 .grafico-wrap { overflow-x:auto; }
 .grafico {
     display:flex; align-items:flex-end; gap:6px;
@@ -102,26 +135,44 @@ td.cero     { color:#bbb; }
 }
 .mes-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; }
 .barras { display:flex; gap:2px; align-items:flex-end; height:130px; }
-.barra {
-    width:14px; border-radius:4px 4px 0 0;
-    transition:height 0.4s ease; min-height:2px;
-}
+.barra { width:14px; border-radius:4px 4px 0 0; transition:height 0.4s ease; min-height:2px; }
 .barra.ing { background:#34a853; }
 .barra.egr { background:#ea4335; }
-.mes-label {
-    font-size:9px; color:#888; font-weight:600;
-    text-align:center; margin-top:6px;
-}
-.leyenda {
-    display:flex; gap:16px; justify-content:center;
-    margin-top:12px; font-size:12px; color:#666;
-}
+.mes-label { font-size:9px; color:#888; font-weight:600; text-align:center; margin-top:6px; }
+.leyenda { display:flex; gap:16px; justify-content:center; margin-top:12px; font-size:12px; color:#666; }
 .leyenda-item { display:flex; align-items:center; gap:5px; }
 .leyenda-dot { width:12px; height:12px; border-radius:3px; }
 
-/* ══════════════════════════════════════
-   LOADING
-══════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   PAGINACIÓN
+═══════════════════════════════════════ */
+.paginacion {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:12px; font-size:13px; color:#555;
+}
+.paginacion-btns { display:flex; gap:6px; }
+.btn-pag {
+    padding:7px 14px; border:1.5px solid #e0e0e0; border-radius:8px;
+    background:white; font-size:12px; font-weight:600; cursor:pointer;
+    color:#1a73e8; transition:background 0.15s;
+}
+.btn-pag:hover { background:#e8f0fe; }
+.btn-pag:disabled { color:#bbb; cursor:default; background:white; }
+
+/* ═══════════════════════════════════════
+   TOTALIZADOR GASTOS
+═══════════════════════════════════════ */
+.total-gastos-bar {
+    background:#fff3e0; border-radius:12px; padding:12px 16px;
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:12px; font-size:13px; font-weight:700;
+}
+.total-gastos-bar .total-label { color:#666; }
+.total-gastos-bar .total-valor { color:#e65100; font-size:16px; }
+
+/* ═══════════════════════════════════════
+   LOADING / EMPTY
+═══════════════════════════════════════ */
 .loading-overlay {
     text-align:center; padding:40px 20px; color:#1a73e8;
     font-weight:600; font-size:14px;
@@ -133,263 +184,418 @@ td.cero     { color:#bbb; }
     margin-right:8px; vertical-align:middle;
 }
 @keyframes spin { to { transform:rotate(360deg); } }
+.empty-state { text-align:center; padding:36px 20px; color:#aaa; }
+.empty-state span { font-size:40px; display:block; margin-bottom:10px; }
 </style>
 
 <!-- TÍTULO -->
 <div style="margin-bottom:16px;">
-    <h1 style="font-size:20px;font-weight:800;color:#333;">📊 Reporte Financiero</h1>
-    <p style="font-size:13px;color:#888;margin-top:4px;">Resumen de ingresos y egresos</p>
+    <h1 style="font-size:20px;font-weight:800;color:#333;">📊 Reportes</h1>
+    <p style="font-size:13px;color:#888;margin-top:4px;">Análisis financiero y detalle de gastos</p>
 </div>
 
-<!-- FILTROS -->
-<div class="filtros-card">
-    <h2>🔍 Filtros</h2>
-    <div class="filtros-row">
-        <div class="filtro-group">
-            <label>Año</label>
-            <select id="filtroAnio"></select>
+<!-- TABS PRINCIPALES -->
+<div class="page-tabs">
+    <button class="page-tab-btn active" onclick="mostrarTab('financiero', this)">📈 Financiero</button>
+    <button class="page-tab-btn" onclick="mostrarTab('gastos', this)">🧾 Gastos</button>
+</div>
+
+<!-- ═══════════════════════════════════════
+     TAB 1 — REPORTE FINANCIERO
+═══════════════════════════════════════ -->
+<div id="tabFinanciero">
+    <div class="filtros-card">
+        <div class="filtros-grid">
+            <div class="filtro-group">
+                <label>Año</label>
+                <select id="filtroAnio"></select>
+            </div>
+            <div class="filtro-group" id="grupoUsuarioFin" style="display:none;">
+                <label>Usuario</label>
+                <select id="filtroUsuarioFin"></select>
+            </div>
         </div>
-        <div class="filtro-group" id="grupoUsuario" style="display:none;">
-            <label>Usuario</label>
-            <select id="filtroUsuario"></select>
+        <div class="filtros-acciones">
+            <button class="btn-filtrar" onclick="cargarReporteFinanciero()">Ver</button>
         </div>
-        <button class="btn-filtrar" onclick="cargarReporte()">Ver</button>
+    </div>
+    <div id="contenidoFinanciero">
+        <div class="loading-overlay"><span class="spinner"></span> Cargando...</div>
     </div>
 </div>
 
-<!-- CONTENIDO DINÁMICO -->
-<div id="contenidoReporte">
-    <div class="loading-overlay">
-        <span class="spinner"></span> Cargando reporte...
+<!-- ═══════════════════════════════════════
+     TAB 2 — REPORTE DE GASTOS
+═══════════════════════════════════════ -->
+<div id="tabGastos" style="display:none;">
+    <div class="filtros-card">
+        <h2>🔍 Filtros</h2>
+        <div class="filtros-grid">
+            <div class="filtro-group">
+                <label>Desde</label>
+                <input type="date" id="gDesde">
+            </div>
+            <div class="filtro-group">
+                <label>Hasta</label>
+                <input type="date" id="gHasta">
+            </div>
+            <div class="filtro-group">
+                <label>RUC</label>
+                <input type="text" id="gRuc" placeholder="Búsqueda parcial...">
+            </div>
+            <div class="filtro-group">
+                <label>Proveedor</label>
+                <input type="text" id="gProveedor" placeholder="Búsqueda parcial...">
+            </div>
+        </div>
+        {% if request.user.is_superuser %}
+        <div class="filtros-grid full" style="margin-bottom:10px;">
+            <div class="filtro-group">
+                <label>Usuario</label>
+                <select id="gUsuario">
+                    <option value="">— Todos los usuarios —</option>
+                </select>
+            </div>
+        </div>
+        {% endif %}
+        <div class="filtros-acciones">
+            <button class="btn-filtrar" onclick="cargarGastos(1)">🔍 Filtrar</button>
+            <button class="btn-limpiar" onclick="limpiarFiltrosGastos()">✕ Limpiar</button>
+            <button class="btn-excel" onclick="exportarExcelGastos()">📥 Excel</button>
+        </div>
+    </div>
+
+    <div id="totalizadorGastos" style="display:none;" class="total-gastos-bar">
+        <span class="total-label">Total filtrado:</span>
+        <span class="total-valor" id="totalGastosValor">—</span>
+    </div>
+
+    <div id="contenidoGastos">
+        <div class="loading-overlay"><span class="spinner"></span> Cargando...</div>
     </div>
 </div>
 
 <script>
-// ══════════════════════════════════════
-// INIT
-// ══════════════════════════════════════
 const esSuperuser = {{ request.user.is_superuser|yesno:"true,false" }};
+let gastosPage = 1;
+let gastosPageSize = 50;
 
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-    // Poblar selector de años (últimos 3)
+    // Selector años
     const anioActual = new Date().getFullYear();
     const selAnio = document.getElementById('filtroAnio');
     for (let a = anioActual; a >= anioActual - 2; a--) {
         const opt = document.createElement('option');
-        opt.value = a; opt.textContent = a;
-        selAnio.appendChild(opt);
+        opt.value = a; opt.textContent = a; selAnio.appendChild(opt);
     }
 
-    // Si es superuser, mostrar filtro de usuario
     if (esSuperuser) {
-        document.getElementById('grupoUsuario').style.display = 'block';
-        cargarUsuarios();
+        document.getElementById('grupoUsuarioFin').style.display = 'block';
+        cargarUsuariosSelects();
     }
 
-    cargarReporte();
+    cargarReporteFinanciero();
+
+    // Restaurar filtros guardados en sessionStorage
+    restaurarFiltrosGastos();
 });
 
-// ══════════════════════════════════════
-// CARGAR USUARIOS (solo superuser)
-// ══════════════════════════════════════
-async function cargarUsuarios() {
+// ═══════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════
+function mostrarTab(tab, btn) {
+    document.getElementById('tabFinanciero').style.display = tab === 'financiero' ? 'block' : 'none';
+    document.getElementById('tabGastos').style.display     = tab === 'gastos'     ? 'block' : 'none';
+    document.querySelectorAll('.page-tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (tab === 'gastos') cargarGastos(gastosPage);
+}
+
+// ═══════════════════════════════════════
+// CARGAR USUARIOS (ambos selects)
+// ═══════════════════════════════════════
+async function cargarUsuariosSelects() {
     try {
         const res = await fetch('/api/usuarios/');
         const usuarios = await res.json();
-        const sel = document.getElementById('filtroUsuario');
-        sel.innerHTML = '<option value="">— Todos / Mi usuario —</option>';
-        usuarios.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u.id;
-            const nombre = (u.first_name || u.last_name)
-                ? `${u.first_name} ${u.last_name}`.trim()
-                : u.username;
-            opt.textContent = `${nombre} (@${u.username})`;
-            sel.appendChild(opt);
+        const ids = ['filtroUsuarioFin', 'gUsuario'];
+        ids.forEach(id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            if (id === 'filtroUsuarioFin') {
+                sel.innerHTML = '<option value="">— Todos / Mi usuario —</option>';
+            }
+            usuarios.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.id;
+                const nombre = (u.first_name || u.last_name)
+                    ? `${u.first_name} ${u.last_name}`.trim()
+                    : u.username;
+                opt.textContent = `${nombre} (@${u.username})`;
+                sel.appendChild(opt);
+            });
         });
     } catch(e) { console.error(e); }
 }
 
-// ══════════════════════════════════════
-// CARGAR REPORTE
-// ══════════════════════════════════════
-async function cargarReporte() {
-    document.getElementById('contenidoReporte').innerHTML = `
-        <div class="loading-overlay">
-            <span class="spinner"></span> Calculando...
-        </div>`;
+// ═══════════════════════════════════════
+// TAB FINANCIERO
+// ═══════════════════════════════════════
+async function cargarReporteFinanciero() {
+    document.getElementById('contenidoFinanciero').innerHTML =
+        '<div class="loading-overlay"><span class="spinner"></span> Calculando...</div>';
 
     const anio = document.getElementById('filtroAnio').value;
-    const usuarioId = esSuperuser
-        ? document.getElementById('filtroUsuario').value
-        : '';
+    const uId  = esSuperuser ? (document.getElementById('filtroUsuarioFin').value || '') : '';
 
     let url = `/api/reporte/?anio=${anio}`;
-    if (usuarioId) url += `&usuario_id=${usuarioId}`;
+    if (uId) url += `&usuario_id=${uId}`;
 
     try {
         const res = await fetch(url);
-        if (!res.ok) throw new Error('Error en la respuesta');
-        const d = await res.json();
-        renderReporte(d);
+        if (!res.ok) throw new Error();
+        renderFinanciero(await res.json());
     } catch(e) {
-        document.getElementById('contenidoReporte').innerHTML = `
-            <div class="loading-overlay">⚠️ Error al cargar el reporte.</div>`;
+        document.getElementById('contenidoFinanciero').innerHTML =
+            '<div class="loading-overlay">⚠️ Error al cargar el reporte.</div>';
     }
 }
 
-// ══════════════════════════════════════
-// RENDERIZAR
-// ══════════════════════════════════════
-function renderReporte(d) {
+function renderFinanciero(d) {
     const r = d.resumen;
     const meses = d.mensual;
     const mesActual = d.mes_actual;
+    const fmt = n => Math.abs(n).toLocaleString('es-PY', { maximumFractionDigits:0 });
+    const fmtS = n => (n < 0 ? '- ' : '') + 'Gs. ' + fmt(n);
+    const signo = n => n >= 0 ? 'pos' : 'neg';
 
-    const fmt = (n) => Math.abs(n).toLocaleString('es-PY', { maximumFractionDigits:0 });
-    const fmtSigned = (n) => (n < 0 ? '- ' : '') + 'Gs. ' + fmt(n);
-    const signo = (n) => n >= 0 ? 'pos' : 'neg';
-
-    // Balance mensual — color dinámico
-    const balMesColor = r.balance_mes >= 0 ? '#a5d6a7' : '#ef9a9a';
-
-    // ── Cards de resumen ────────────────────────────────────────────────────
     const cardsHTML = `
-        <p class="resumen-header">
-            👤 ${d.usuario.nombre} &nbsp;|&nbsp; 📅 Año ${d.anio}
-        </p>
+        <p class="resumen-header">👤 ${d.usuario.nombre} &nbsp;|&nbsp; 📅 Año ${d.anio}</p>
         <div class="balance-card">
             <div class="lbl">Balance del Mes Actual</div>
-            <div class="val" style="color:${balMesColor};">
-                ${fmtSigned(r.balance_mes)}
+            <div class="val" style="color:${r.balance_mes >= 0 ? '#a5d6a7' : '#ef9a9a'};">
+                ${fmtS(r.balance_mes)}
             </div>
             <div class="sub">Ingresos vs Egresos del mes en curso</div>
         </div>
         <div class="dash-grid">
-            <div class="dash-card">
-                <div class="lbl">Ingresos del Mes</div>
-                <div class="val pos">Gs. ${fmt(r.ingresos_mes)}</div>
-                <div class="sub">Mes actual</div>
-            </div>
-            <div class="dash-card">
-                <div class="lbl">Egresos del Mes</div>
-                <div class="val neg">Gs. ${fmt(r.egresos_mes)}</div>
-                <div class="sub">Facturas</div>
-            </div>
-            <div class="dash-card">
-                <div class="lbl">Ingresos Anuales</div>
-                <div class="val pos">Gs. ${fmt(r.ingresos_anio)}</div>
-                <div class="sub">Año ${d.anio}</div>
-            </div>
-            <div class="dash-card">
-                <div class="lbl">Egresos Anuales</div>
-                <div class="val neg">Gs. ${fmt(r.egresos_anio)}</div>
-                <div class="sub">Año ${d.anio}</div>
-            </div>
-            <div class="dash-card full">
-                <div class="lbl">Balance Anual</div>
-                <div class="val ${signo(r.balance_anio)}">
-                    ${fmtSigned(r.balance_anio)}
-                </div>
-            </div>
-        </div>
-    `;
+            <div class="dash-card"><div class="lbl">Ingresos Mes</div>
+                <div class="val pos">Gs. ${fmt(r.ingresos_mes)}</div></div>
+            <div class="dash-card"><div class="lbl">Egresos Mes</div>
+                <div class="val neg">Gs. ${fmt(r.egresos_mes)}</div></div>
+            <div class="dash-card"><div class="lbl">Ingresos Año</div>
+                <div class="val pos">Gs. ${fmt(r.ingresos_anio)}</div></div>
+            <div class="dash-card"><div class="lbl">Egresos Año</div>
+                <div class="val neg">Gs. ${fmt(r.egresos_anio)}</div></div>
+            <div class="dash-card full"><div class="lbl">Balance Anual</div>
+                <div class="val ${signo(r.balance_anio)}">${fmtS(r.balance_anio)}</div></div>
+        </div>`;
 
-    // ── Gráfico de barras ───────────────────────────────────────────────────
     const maxVal = Math.max(...meses.map(m => Math.max(m.ingresos, m.egresos)), 1);
-
     const barrasHTML = meses.map(m => {
-        const hIng = Math.round((m.ingresos / maxVal) * 120);
-        const hEgr = Math.round((m.egresos  / maxVal) * 120);
-        const esMesActual = m.mes === mesActual && d.anio === new Date().getFullYear();
-        return `
-            <div class="mes-col">
-                <div class="barras">
-                    <div class="barra ing" style="height:${hIng}px;"
-                         title="Ingresos ${m.nombre}: Gs. ${fmt(m.ingresos)}"></div>
-                    <div class="barra egr" style="height:${hEgr}px;"
-                         title="Egresos ${m.nombre}: Gs. ${fmt(m.egresos)}"></div>
-                </div>
-                <div class="mes-label" style="${esMesActual ? 'color:#1a73e8;font-weight:800;' : ''}">
-                    ${m.nombre}
-                </div>
-            </div>`;
+        const hI = Math.round((m.ingresos / maxVal) * 120);
+        const hE = Math.round((m.egresos  / maxVal) * 120);
+        const esHoy = m.mes === mesActual && d.anio === new Date().getFullYear();
+        return `<div class="mes-col">
+            <div class="barras">
+                <div class="barra ing" style="height:${hI}px;"
+                     title="Ing ${m.nombre}: Gs. ${fmt(m.ingresos)}"></div>
+                <div class="barra egr" style="height:${hE}px;"
+                     title="Egr ${m.nombre}: Gs. ${fmt(m.egresos)}"></div>
+            </div>
+            <div class="mes-label" style="${esHoy ? 'color:#1a73e8;font-weight:800;' : ''}">${m.nombre}</div>
+        </div>`;
     }).join('');
 
     const graficoHTML = `
         <div class="grafico-card">
             <h3>📈 Ingresos vs Egresos — ${d.anio}</h3>
-            <div class="grafico-wrap">
-                <div class="grafico">${barrasHTML}</div>
-            </div>
+            <div class="grafico-wrap"><div class="grafico">${barrasHTML}</div></div>
             <div class="leyenda">
-                <div class="leyenda-item">
-                    <div class="leyenda-dot" style="background:#34a853;"></div> Ingresos
-                </div>
-                <div class="leyenda-item">
-                    <div class="leyenda-dot" style="background:#ea4335;"></div> Egresos
-                </div>
+                <div class="leyenda-item"><div class="leyenda-dot" style="background:#34a853;"></div> Ingresos</div>
+                <div class="leyenda-item"><div class="leyenda-dot" style="background:#ea4335;"></div> Egresos</div>
             </div>
-        </div>
-    `;
+        </div>`;
 
-    // ── Tabla mensual ───────────────────────────────────────────────────────
     const filas = meses.map(m => {
-        const esMesActual = m.mes === mesActual && d.anio === new Date().getFullYear();
-        const clsBal = m.balance > 0 ? 'positivo' : m.balance < 0 ? 'negativo' : 'cero';
-        const clsIng = m.ingresos > 0 ? 'positivo' : 'cero';
-        const clsEgr = m.egresos  > 0 ? 'negativo' : 'cero';
-        return `
-            <tr class="${esMesActual ? 'mes-actual' : ''}">
-                <td>${esMesActual ? '▶ ' : ''}${m.nombre}</td>
-                <td class="${clsIng}">
-                    ${m.ingresos > 0 ? 'Gs. ' + fmt(m.ingresos) : '—'}
-                </td>
-                <td class="${clsEgr}">
-                    ${m.egresos  > 0 ? 'Gs. ' + fmt(m.egresos)  : '—'}
-                </td>
-                <td class="${clsBal}">
-                    ${m.balance !== 0
-                        ? (m.balance > 0 ? '+' : '-') + ' Gs. ' + fmt(m.balance)
-                        : '—'}
-                </td>
-            </tr>`;
+        const esHoy = m.mes === mesActual && d.anio === new Date().getFullYear();
+        const cb = m.balance > 0 ? 'positivo' : m.balance < 0 ? 'negativo' : 'cero';
+        return `<tr class="${esHoy ? 'mes-actual' : ''}">
+            <td>${esHoy ? '▶ ' : ''}${m.nombre}</td>
+            <td class="${m.ingresos > 0 ? 'positivo' : 'cero'}">${m.ingresos > 0 ? 'Gs. '+fmt(m.ingresos) : '—'}</td>
+            <td class="${m.egresos  > 0 ? 'negativo' : 'cero'}">${m.egresos  > 0 ? 'Gs. '+fmt(m.egresos)  : '—'}</td>
+            <td class="${cb}">${m.balance !== 0 ? (m.balance > 0 ? '+' : '-')+' Gs. '+fmt(m.balance) : '—'}</td>
+        </tr>`;
     }).join('');
-
-    const totalBal = r.balance_anio;
-    const clsTotalBal = totalBal > 0 ? 'positivo' : totalBal < 0 ? 'negativo' : 'cero';
+    const cb = r.balance_anio > 0 ? 'positivo' : r.balance_anio < 0 ? 'negativo' : 'cero';
 
     const tablaHTML = `
         <div class="tabla-card">
             <h3>📋 Detalle Mensual — ${d.anio}</h3>
-            <div style="overflow-x:auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Mes</th>
-                            <th>💰 Ingresos</th>
-                            <th>🧾 Egresos</th>
-                            <th>⚖️ Balance</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${filas}
-                        <tr class="total-row">
-                            <td>TOTAL</td>
-                            <td class="positivo">Gs. ${fmt(r.ingresos_anio)}</td>
-                            <td class="negativo">Gs. ${fmt(r.egresos_anio)}</td>
-                            <td class="${clsTotalBal}">
-                                ${(totalBal > 0 ? '+' : '-')} Gs. ${fmt(totalBal)}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
+            <table><thead><tr>
+                <th>Mes</th><th>💰 Ingresos</th><th>🧾 Egresos</th><th>⚖️ Balance</th>
+            </tr></thead><tbody>
+                ${filas}
+                <tr class="total-row">
+                    <td>TOTAL</td>
+                    <td class="positivo">Gs. ${fmt(r.ingresos_anio)}</td>
+                    <td class="negativo">Gs. ${fmt(r.egresos_anio)}</td>
+                    <td class="${cb}">${(r.balance_anio > 0 ? '+' : '-')} Gs. ${fmt(r.balance_anio)}</td>
+                </tr>
+            </tbody></table>
+        </div>`;
 
-    document.getElementById('contenidoReporte').innerHTML =
-        cardsHTML + graficoHTML + tablaHTML;
+    document.getElementById('contenidoFinanciero').innerHTML = cardsHTML + graficoHTML + tablaHTML;
+}
+
+// ═══════════════════════════════════════
+// TAB GASTOS — filtros persistentes
+// ═══════════════════════════════════════
+function guardarFiltrosGastos() {
+    const f = {
+        desde:     document.getElementById('gDesde').value,
+        hasta:     document.getElementById('gHasta').value,
+        ruc:       document.getElementById('gRuc').value,
+        proveedor: document.getElementById('gProveedor').value,
+        usuario:   esSuperuser ? document.getElementById('gUsuario').value : '',
+    };
+    sessionStorage.setItem('filtrosGastos', JSON.stringify(f));
+}
+
+function restaurarFiltrosGastos() {
+    try {
+        const f = JSON.parse(sessionStorage.getItem('filtrosGastos') || '{}');
+        if (f.desde)     document.getElementById('gDesde').value     = f.desde;
+        if (f.hasta)     document.getElementById('gHasta').value     = f.hasta;
+        if (f.ruc)       document.getElementById('gRuc').value       = f.ruc;
+        if (f.proveedor) document.getElementById('gProveedor').value = f.proveedor;
+    } catch(e) {}
+}
+
+function limpiarFiltrosGastos() {
+    ['gDesde','gHasta','gRuc','gProveedor'].forEach(id => {
+        document.getElementById(id).value = '';
+    });
+    if (esSuperuser) document.getElementById('gUsuario').value = '';
+    sessionStorage.removeItem('filtrosGastos');
+    cargarGastos(1);
+}
+
+function _buildGastosParams(page) {
+    const params = new URLSearchParams();
+    const desde     = document.getElementById('gDesde').value;
+    const hasta     = document.getElementById('gHasta').value;
+    const ruc       = document.getElementById('gRuc').value.trim();
+    const proveedor = document.getElementById('gProveedor').value.trim();
+    const uId       = esSuperuser ? document.getElementById('gUsuario').value : '';
+    if (desde)     params.set('desde', desde);
+    if (hasta)     params.set('hasta', hasta);
+    if (ruc)       params.set('ruc', ruc);
+    if (proveedor) params.set('proveedor', proveedor);
+    if (uId)       params.set('usuario_id', uId);
+    params.set('page', page);
+    params.set('page_size', gastosPageSize);
+    return params;
+}
+
+async function cargarGastos(page) {
+    gastosPage = page;
+    guardarFiltrosGastos();
+    document.getElementById('contenidoGastos').innerHTML =
+        '<div class="loading-overlay"><span class="spinner"></span> Cargando gastos...</div>';
+    document.getElementById('totalizadorGastos').style.display = 'none';
+
+    const params = _buildGastosParams(page);
+    try {
+        const res = await fetch('/api/facturas/reporte-gastos/?' + params.toString());
+        if (!res.ok) throw new Error();
+        renderGastos(await res.json());
+    } catch(e) {
+        document.getElementById('contenidoGastos').innerHTML =
+            '<div class="loading-overlay">⚠️ Error al cargar los gastos.</div>';
+    }
+}
+
+function renderGastos(d) {
+    const fmt = n => Number(n).toLocaleString('es-PY', { maximumFractionDigits:0 });
+
+    // Totalizador
+    const totalBar = document.getElementById('totalizadorGastos');
+    document.getElementById('totalGastosValor').textContent = 'Gs. ' + fmt(d.total_importe);
+    totalBar.style.display = 'flex';
+
+    if (!d.items.length) {
+        document.getElementById('contenidoGastos').innerHTML = `
+            <div class="empty-state"><span>🔍</span>
+            <p>No se encontraron gastos con los filtros aplicados.</p></div>`;
+        return;
+    }
+
+    const filas = d.items.map(f => {
+        const tipoCls = f.tipo && f.tipo.toLowerCase().includes('electr') ? 'badge-tipo-e' : 'badge-tipo-ne';
+        const fecha = f.fecha_emision
+            ? f.fecha_emision.split('-').reverse().join('/')
+            : '—';
+        return `<tr>
+            <td>${f.usuario}</td>
+            <td><span class="badge-sm ${tipoCls}">${f.tipo}</span></td>
+            <td style="white-space:nowrap">${fecha}</td>
+            <td>${f.timbrado || '—'}</td>
+            <td>${f.ruc || '—'}</td>
+            <td>${f.nombre_proveedor || '—'}</td>
+            <td style="text-align:right;font-weight:700;">
+                ${f.importe_total !== null ? 'Gs. '+fmt(f.importe_total) : '—'}
+            </td>
+        </tr>`;
+    }).join('');
+
+    const tablaHTML = `
+        <div class="tabla-card">
+            <h3>🧾 Gastos <span style="font-weight:400;color:#888;font-size:12px;">${d.total} registro${d.total !== 1 ? 's' : ''}</span></h3>
+            <table>
+                <thead><tr>
+                    <th>Usuario</th>
+                    <th>Tipo</th>
+                    <th>Fecha</th>
+                    <th>Timbrado</th>
+                    <th>RUC</th>
+                    <th>Proveedor</th>
+                    <th style="text-align:right">Importe</th>
+                </tr></thead>
+                <tbody>${filas}</tbody>
+            </table>
+        </div>`;
+
+    // Paginación
+    const pagHTML = d.pages > 1 ? `
+        <div class="paginacion">
+            <span>Pág. ${d.page} de ${d.pages}</span>
+            <div class="paginacion-btns">
+                <button class="btn-pag" onclick="cargarGastos(${d.page - 1})"
+                    ${d.page <= 1 ? 'disabled' : ''}>← Anterior</button>
+                <button class="btn-pag" onclick="cargarGastos(${d.page + 1})"
+                    ${d.page >= d.pages ? 'disabled' : ''}>Siguiente →</button>
+            </div>
+        </div>` : '';
+
+    document.getElementById('contenidoGastos').innerHTML = tablaHTML + pagHTML;
+}
+
+// ═══════════════════════════════════════
+// EXPORTAR EXCEL DESDE REPORTE GASTOS
+// ═══════════════════════════════════════
+function exportarExcelGastos() {
+    const params = new URLSearchParams();
+    const desde     = document.getElementById('gDesde').value;
+    const hasta     = document.getElementById('gHasta').value;
+    const uId       = esSuperuser ? document.getElementById('gUsuario').value : '';
+    if (desde) params.set('desde', desde);
+    if (hasta) params.set('hasta', hasta);
+    if (uId)   params.set('usuario_id', uId);
+    window.location.href = '/api/facturas/exportar-excel/?' + params.toString();
 }
 </script>
 {% endblock %}

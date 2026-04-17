@@ -18,7 +18,11 @@ import requests
 import re
 import csv
 import io
+from django.http import HttpResponse
 from django.db.models.functions import TruncMonth
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 
 # ══════════════════════════════════════════════════════
@@ -421,6 +425,217 @@ class FacturaImportCSVView(APIView):
             'detalle_errores': errores,
             'detalle_importadas': importadas,
         }, status=status.HTTP_200_OK)
+
+
+# ══════════════════════════════════════════════════════
+# REPORTE DE GASTOS — lista detallada con filtros
+# ══════════════════════════════════════════════════════
+
+class FacturaReporteGastosView(APIView):
+    """
+    Lista paginada de facturas con filtros combinables.
+
+    Parámetros GET:
+      - desde        YYYY-MM-DD  (fecha_emision >=)
+      - hasta        YYYY-MM-DD  (fecha_emision <=)
+      - ruc          texto parcial
+      - proveedor    texto parcial
+      - usuario_id   int  (solo superuser)
+      - page         int  (default 1)
+      - page_size    int  (default 50, max 200)
+    """
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        qs = Factura.objects.select_related('usuario').order_by('-fecha_emision', '-creado')
+
+        # Permisos: superuser ve todos, usuario normal solo los propios
+        if request.user.is_superuser:
+            usuario_id = request.GET.get('usuario_id')
+            if usuario_id:
+                qs = qs.filter(usuario_id=usuario_id)
+        else:
+            qs = qs.filter(usuario=request.user)
+
+        # Filtros
+        desde = request.GET.get('desde')
+        hasta = request.GET.get('hasta')
+        ruc = request.GET.get('ruc', '').strip()
+        proveedor = request.GET.get('proveedor', '').strip()
+
+        if desde:
+            qs = qs.filter(fecha_emision__gte=desde)
+        if hasta:
+            qs = qs.filter(fecha_emision__lte=hasta)
+        if ruc:
+            qs = qs.filter(ruc__icontains=ruc)
+        if proveedor:
+            qs = qs.filter(nombre_proveedor__icontains=proveedor)
+
+        total = qs.count()
+        total_importe = qs.aggregate(s=Sum('importe_total'))['s'] or 0
+
+        # Paginación
+        try:
+            page = max(1, int(request.GET.get('page', 1)))
+            page_size = min(200, max(1, int(request.GET.get('page_size', 50))))
+        except (ValueError, TypeError):
+            page, page_size = 1, 50
+
+        offset = (page - 1) * page_size
+        facturas = qs[offset:offset + page_size]
+
+        def ruc_sin_dv(ruc_str):
+            """Devuelve solo la parte numérica antes del guion."""
+            return ruc_str.split('-')[0].strip() if ruc_str else ''
+
+        items = []
+        for f in facturas:
+            items.append({
+                'id': f.pk,
+                'usuario': f.usuario.get_full_name() or f.usuario.username if f.usuario else '—',
+                'tipo': f.get_tipo_display(),
+                'fecha_emision': str(f.fecha_emision) if f.fecha_emision else None,
+                'timbrado': f.timbrado,
+                'numero_factura': f.numero_factura,
+                'ruc': ruc_sin_dv(f.ruc),
+                'nombre_proveedor': f.nombre_proveedor,
+                'importe_total': float(f.importe_total) if f.importe_total is not None else None,
+                'importe_impuesto': float(f.importe_impuesto) if f.importe_impuesto is not None else None,
+                'estado': f.get_estado_display(),
+            })
+
+        return Response({
+            'total': total,
+            'total_importe': float(total_importe),
+            'page': page,
+            'page_size': page_size,
+            'pages': -(-total // page_size),   # ceil division
+            'items': items,
+        })
+
+
+# ══════════════════════════════════════════════════════
+# EXPORTACIÓN EXCEL DE GASTOS
+# ══════════════════════════════════════════════════════
+
+def _ruc_sin_dv(ruc_str):
+    return ruc_str.split('-')[0].strip() if ruc_str else ''
+
+
+class FacturaExportExcelView(APIView):
+    """
+    Descarga un archivo Excel con las facturas filtradas.
+
+    Parámetros GET:
+      - desde        YYYY-MM-DD
+      - hasta        YYYY-MM-DD
+      - usuario_id   int (solo superuser)
+    """
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        qs = Factura.objects.select_related('usuario').order_by('fecha_emision', 'nombre_proveedor')
+
+        if request.user.is_superuser:
+            usuario_id = request.GET.get('usuario_id')
+            if usuario_id:
+                qs = qs.filter(usuario_id=usuario_id)
+        else:
+            qs = qs.filter(usuario=request.user)
+
+        desde = request.GET.get('desde')
+        hasta = request.GET.get('hasta')
+        if desde:
+            qs = qs.filter(fecha_emision__gte=desde)
+        if hasta:
+            qs = qs.filter(fecha_emision__lte=hasta)
+
+        # ── Construir Excel ────────────────────────────────────────────────────
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Gastos'
+
+        # Estilos
+        hdr_fill   = PatternFill('solid', fgColor='1A73E8')
+        hdr_font   = Font(bold=True, color='FFFFFF', size=11)
+        hdr_align  = Alignment(horizontal='center', vertical='center')
+        total_fill = PatternFill('solid', fgColor='E8F0FE')
+        total_font = Font(bold=True, size=11)
+        thin = Side(style='thin', color='CCCCCC')
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        # Encabezados
+        columnas = ['Usuario', 'Tipo', 'Fecha', 'Timbrado', 'N° Factura', 'RUC', 'Proveedor', 'Importe (Gs.)']
+        for col_idx, titulo in enumerate(columnas, 1):
+            cell = ws.cell(row=1, column=col_idx, value=titulo)
+            cell.fill  = hdr_fill
+            cell.font  = hdr_font
+            cell.alignment = hdr_align
+            cell.border = border
+
+        ws.row_dimensions[1].height = 22
+
+        # Datos
+        total_importe = 0
+        for row_idx, f in enumerate(qs, start=2):
+            usuario_str = ''
+            if f.usuario:
+                usuario_str = f.usuario.get_full_name() or f.usuario.username
+            importe = float(f.importe_total) if f.importe_total is not None else 0
+            total_importe += importe
+
+            fila = [
+                usuario_str,
+                f.get_tipo_display(),
+                f.fecha_emision.strftime('%d/%m/%Y') if f.fecha_emision else '',
+                f.timbrado,
+                f.numero_factura,
+                _ruc_sin_dv(f.ruc),
+                f.nombre_proveedor,
+                importe,
+            ]
+            for col_idx, valor in enumerate(fila, 1):
+                cell = ws.cell(row=row_idx, column=col_idx, value=valor)
+                cell.border = border
+                cell.alignment = Alignment(vertical='center')
+                if col_idx == 8:  # Importe
+                    cell.number_format = '#,##0'
+
+        # Fila total
+        total_row = qs.count() + 2
+        ws.cell(row=total_row, column=7, value='TOTAL').font = total_font
+        ws.cell(row=total_row, column=7).fill = total_fill
+        ws.cell(row=total_row, column=7).alignment = Alignment(horizontal='right')
+        total_cell = ws.cell(row=total_row, column=8, value=total_importe)
+        total_cell.font = total_font
+        total_cell.fill = total_fill
+        total_cell.number_format = '#,##0'
+
+        # Anchos de columna
+        anchos = [22, 18, 14, 14, 20, 14, 32, 18]
+        for i, ancho in enumerate(anchos, 1):
+            ws.column_dimensions[get_column_letter(i)].width = ancho
+
+        ws.freeze_panes = 'A2'
+
+        # Nombre de archivo
+        from datetime import date
+        sufijo = ''
+        if desde or hasta:
+            sufijo = f"_{desde or ''}_{hasta or ''}"
+        filename = f"gastos{sufijo}_{date.today().strftime('%Y%m%d')}.xlsx"
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
 
 
 # ══════════════════════════════════════════════════════

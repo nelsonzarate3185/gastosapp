@@ -309,6 +309,10 @@
                 style="margin-top:8px; background:#ede7f6; color:#4527a0; border-color:#ce93d8;">
             📂 Importar desde CSV
         </button>
+        <button class="btn-manual" onclick="abrirModalExcel()"
+                style="margin-top:8px; background:#e6f4ea; color:#137333; border-color:#a8d5b5;">
+            📥 Exportar a Excel
+        </button>
     </div>
 
     <!-- FORMULARIO OCR / CONFIRMACIÓN -->
@@ -486,6 +490,45 @@
             <span>💸</span>
             <p>Cargando ingresos...</p>
         </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MODAL EXPORTACIÓN EXCEL
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="modalExcel">
+    <div class="modal-box">
+        <h2>📥 Exportar Gastos a Excel</h2>
+        <p class="subtitle">Filtrá por período. Si no seleccionás fechas, se exportan todos los registros.</p>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Desde</label>
+                <input type="date" id="xlDesde">
+            </div>
+            <div class="form-group">
+                <label>Hasta</label>
+                <input type="date" id="xlHasta">
+            </div>
+        </div>
+
+        {% if request.user.is_superuser %}
+        <div class="form-group" id="xlGrupoUsuario">
+            <label>Usuario (opcional)</label>
+            <select id="xlUsuario">
+                <option value="">— Todos los usuarios —</option>
+            </select>
+        </div>
+        {% endif %}
+
+        <button class="btn-confirmar verde" style="width:100%; margin-top:8px;"
+                onclick="descargarExcel()">
+            📥 Descargar Excel
+        </button>
+        <button class="btn-cancelar" style="width:100%; margin-top:8px; text-align:center;"
+                onclick="cerrarModalExcel()">
+            Cancelar
+        </button>
     </div>
 </div>
 
@@ -930,6 +973,48 @@ async function cargarListaIngresos() {
     } catch(e) {
         contenedor.innerHTML = '<div class="empty-state"><span>⚠️</span><p>Error al cargar ingresos.</p></div>';
     }
+}
+
+// ══════════════════════════════════════
+// EXPORTACIÓN EXCEL
+// ══════════════════════════════════════
+function abrirModalExcel() {
+    // Pre-cargar usuarios si es superuser
+    const selXl = document.getElementById('xlUsuario');
+    if (selXl && selXl.options.length === 1 && usuariosCache.length) {
+        usuariosCache.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.id;
+            const nombre = (u.first_name || u.last_name)
+                ? `${u.first_name} ${u.last_name}`.trim()
+                : u.username;
+            opt.textContent = `${nombre} (@${u.username})`;
+            selXl.appendChild(opt);
+        });
+    }
+    document.getElementById('modalExcel').classList.add('open');
+}
+
+function cerrarModalExcel() {
+    document.getElementById('modalExcel').classList.remove('open');
+}
+
+function descargarExcel() {
+    const desde  = document.getElementById('xlDesde').value;
+    const hasta  = document.getElementById('xlHasta').value;
+    const selXl  = document.getElementById('xlUsuario');
+    const uId    = selXl ? selXl.value : '';
+
+    let url = '/api/facturas/exportar-excel/?';
+    const params = new URLSearchParams();
+    if (desde) params.set('desde', desde);
+    if (hasta) params.set('hasta', hasta);
+    if (uId)   params.set('usuario_id', uId);
+    url += params.toString();
+
+    // Abrir en la misma ventana — el navegador descarga el archivo automáticamente
+    window.location.href = url;
+    cerrarModalExcel();
 }
 
 // ══════════════════════════════════════
