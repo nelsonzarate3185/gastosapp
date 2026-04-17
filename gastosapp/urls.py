@@ -10,6 +10,7 @@ from facturas.views import (
     FacturaListView,
     FacturaDetailView,
     FacturaConfirmarView,
+    FacturaImportCSVView,
     # Ingresos ✅ NUEVO
     IngresoListCreateView,
     IngresoDetailView,
@@ -38,6 +39,7 @@ urlpatterns = [
     path('api/facturas/', FacturaListView.as_view(), name='factura-list'),
     path('api/facturas/subir/', FacturaUploadView.as_view(), name='factura-upload'),
     path('api/facturas/confirmar/', FacturaConfirmarView.as_view(), name='factura-confirmar'),
+    path('api/facturas/importar-csv/', FacturaImportCSVView.as_view(), name='factura-importar-csv'),
     path('api/facturas/<int:pk>/', FacturaDetailView.as_view(), name='factura-detail'),
 
     # ── API Ingresos ✅ NUEVO ─────────────────────────────

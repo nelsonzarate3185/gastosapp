@@ -28,6 +28,7 @@ class FacturaSerializer(serializers.ModelSerializer):
             'tipo',
             'fecha_emision',
             'timbrado',
+            'numero_factura',
             'ruc',
             'nombre_proveedor',
             'importe_total',

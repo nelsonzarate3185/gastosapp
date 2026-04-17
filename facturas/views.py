@@ -16,6 +16,8 @@ from .models import Factura, Ingreso
 from .serializers import FacturaSerializer, IngresoSerializer, UsuarioSerializer
 import requests
 import re
+import csv
+import io
 from django.db.models.functions import TruncMonth
 
 
@@ -239,6 +241,186 @@ class FacturaDetailView(APIView):
                 {'error': 'Factura no encontrada.'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+# ══════════════════════════════════════════════════════
+# IMPORTACIÓN CSV DE FACTURAS
+# ══════════════════════════════════════════════════════
+
+# Encabezados esperados en el CSV (insensible a mayúsculas/espacios)
+_CSV_COLUMNAS = ['tipo', 'timbrado', 'ruc', 'nombre_proveedor', 'numero_factura', 'total_factura', 'total_iva']
+
+_TIPO_MAP = {
+    'ELECTRONICA': 'electronica',
+    'NO ELECTRONICA': 'no_electronica',
+    'NO_ELECTRONICA': 'no_electronica',
+}
+
+
+def _normalizar_monto(valor):
+    """Convierte '1.500.000' o '1500000' o '1,500,000' a Decimal."""
+    valor = valor.strip().replace(' ', '')
+    # Si tiene punto como separador de miles (ej: 1.500.000) → quitar puntos
+    # Si tiene coma como separador decimal (ej: 1500,50) → reemplazar por punto
+    # Heurística: si hay más de un punto, son separadores de miles
+    if valor.count('.') > 1:
+        valor = valor.replace('.', '')
+    elif valor.count('.') == 1 and valor.count(',') == 0:
+        # puede ser separador decimal o de miles — si hay 3 dígitos después del punto, es miles
+        partes = valor.split('.')
+        if len(partes[1]) == 3:
+            valor = valor.replace('.', '')
+    valor = valor.replace(',', '.')
+    return valor
+
+
+class FacturaImportCSVView(APIView):
+    """
+    Importa facturas desde un archivo CSV separado por punto y coma (;).
+
+    Columnas requeridas (en cualquier orden, insensibles a mayúsculas):
+        TIPO ; fecha_emision ; timbrado ; RUC ; nombre_proveedor ; numero_factura ; total_factura ; total_IVA
+
+    TIPO aceptados: ELECTRONICA, NO ELECTRONICA, NO_ELECTRONICA
+    fecha_emision: formato DD/MM/YYYY
+    """
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Debe iniciar sesión.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        archivo = request.FILES.get('archivo')
+        if not archivo:
+            return Response({'error': 'No se recibió ningún archivo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not archivo.name.lower().endswith('.csv'):
+            return Response({'error': 'El archivo debe tener extensión .csv.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Leer el contenido detectando la codificación
+        contenido = archivo.read()
+        for encoding in ('utf-8-sig', 'utf-8', 'latin-1'):
+            try:
+                texto = contenido.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            return Response({'error': 'No se pudo decodificar el archivo. Use UTF-8 o Latin-1.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        reader = csv.DictReader(io.StringIO(texto), delimiter=';')
+
+        # Normalizar nombres de columna
+        if reader.fieldnames is None:
+            return Response({'error': 'El archivo CSV está vacío o no tiene encabezados.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        col_map = {col.strip().lower(): col for col in reader.fieldnames}
+        columnas_requeridas = {
+            'tipo': None, 'fecha_emision': None, 'timbrado': None, 'ruc': None,
+            'nombre_proveedor': None, 'numero_factura': None,
+            'total_factura': None, 'total_iva': None,
+        }
+        alias = {
+            'fecha de emision': 'fecha_emision',
+            'fecha de emisión': 'fecha_emision',
+            'fecha': 'fecha_emision',
+            'nombre del proveedor': 'nombre_proveedor',
+            'numero factura': 'numero_factura',
+            'número factura': 'numero_factura',
+            'total factura': 'total_factura',
+            'total iva': 'total_iva',
+            'iva': 'total_iva',
+        }
+        for col_raw, col_original in col_map.items():
+            key = alias.get(col_raw, col_raw)
+            if key in columnas_requeridas:
+                columnas_requeridas[key] = col_original
+
+        faltantes = [k for k, v in columnas_requeridas.items() if v is None]
+        if faltantes:
+            return Response(
+                {'error': f'Faltan las columnas: {", ".join(faltantes)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        importadas = []
+        errores = []
+
+        for num_fila, fila in enumerate(reader, start=2):  # start=2 porque fila 1 es encabezado
+            def campo(key):
+                return (fila.get(columnas_requeridas[key]) or '').strip()
+
+            tipo_raw = campo('tipo').upper()
+            tipo = _TIPO_MAP.get(tipo_raw)
+            if not tipo:
+                errores.append({
+                    'fila': num_fila,
+                    'error': f'TIPO inválido: "{campo("tipo")}". Use ELECTRONICA o NO ELECTRONICA.'
+                })
+                continue
+
+            timbrado = campo('timbrado')
+            ruc = campo('ruc')
+            nombre_proveedor = campo('nombre_proveedor')
+            numero_factura = campo('numero_factura')
+            total_factura_str = campo('total_factura')
+            total_iva_str = campo('total_iva')
+            fecha_str = campo('fecha_emision')
+
+            if not nombre_proveedor:
+                errores.append({'fila': num_fila, 'error': 'nombre_proveedor está vacío.'})
+                continue
+
+            # Parsear fecha DD/MM/YYYY
+            from datetime import datetime as dt
+            fecha_emision = None
+            if fecha_str:
+                try:
+                    fecha_emision = dt.strptime(fecha_str, '%d/%m/%Y').date()
+                except ValueError:
+                    errores.append({'fila': num_fila, 'error': f'fecha_emision inválida: "{fecha_str}". Use DD/MM/YYYY.'})
+                    continue
+
+            try:
+                importe_total = _normalizar_monto(total_factura_str) if total_factura_str else None
+                importe_total = float(importe_total) if importe_total else None
+            except (ValueError, AttributeError):
+                errores.append({'fila': num_fila, 'error': f'total_factura inválido: "{total_factura_str}".'})
+                continue
+
+            try:
+                importe_impuesto = _normalizar_monto(total_iva_str) if total_iva_str else None
+                importe_impuesto = float(importe_impuesto) if importe_impuesto else None
+            except (ValueError, AttributeError):
+                errores.append({'fila': num_fila, 'error': f'total_iva inválido: "{total_iva_str}".'})
+                continue
+
+            factura = Factura(
+                usuario=request.user,
+                tipo=tipo,
+                fecha_emision=fecha_emision,
+                timbrado=timbrado,
+                ruc=ruc,
+                nombre_proveedor=nombre_proveedor,
+                numero_factura=numero_factura,
+                importe_total=importe_total,
+                importe_impuesto=importe_impuesto,
+                carga_manual=True,
+            )
+            factura.save()
+            importadas.append({
+                'fila': num_fila,
+                'id': factura.pk,
+                'nombre_proveedor': nombre_proveedor,
+                'importe_total': importe_total,
+            })
+
+        return Response({
+            'importadas': len(importadas),
+            'errores': len(errores),
+            'detalle_errores': errores,
+            'detalle_importadas': importadas,
+        }, status=status.HTTP_200_OK)
 
 
 # ══════════════════════════════════════════════════════

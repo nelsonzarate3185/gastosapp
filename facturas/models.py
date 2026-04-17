@@ -42,6 +42,7 @@ class Factura(models.Model):
     # Datos de la factura (ya existían)
     fecha_emision = models.DateField(blank=True, null=True)
     timbrado = models.CharField(max_length=100, blank=True)
+    numero_factura = models.CharField(max_length=50, blank=True, help_text="Número de factura (ej: 001-001-0000001)")
     ruc = models.CharField(max_length=20, blank=True)
     nombre_proveedor = models.CharField(max_length=200, blank=True)
 
