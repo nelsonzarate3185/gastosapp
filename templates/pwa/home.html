@@ -207,6 +207,26 @@
 .empty-state span { font-size: 44px; display: block; margin-bottom: 10px; }
 
 /* ══════════════════════════════════════
+   BOTONES DE ACCIÓN (editar/eliminar)
+══════════════════════════════════════ */
+.card-actions {
+    display: flex; gap: 8px; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid #f0f0f0;
+}
+.btn-edit {
+    flex: 1; padding: 7px; background: #e8f0fe; color: #1a73e8;
+    border: none; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s;
+}
+.btn-edit:hover { background: #d2e3fc; }
+.btn-delete {
+    flex: 1; padding: 7px; background: #fce8e6; color: #c5221f;
+    border: none; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s;
+}
+.btn-delete:hover { background: #f5c6c2; }
+
+/* ══════════════════════════════════════
    MODAL IMPORTACIÓN CSV
 ══════════════════════════════════════ */
 .modal-overlay {
@@ -309,10 +329,6 @@
                 style="margin-top:8px; background:#ede7f6; color:#4527a0; border-color:#ce93d8;">
             📂 Importar desde CSV
         </button>
-        <button class="btn-manual" onclick="abrirModalExcel()"
-                style="margin-top:8px; background:#e6f4ea; color:#137333; border-color:#a8d5b5;">
-            📥 Exportar a Excel
-        </button>
     </div>
 
     <!-- FORMULARIO OCR / CONFIRMACIÓN -->
@@ -411,7 +427,7 @@
                 </div>
             </div>
             <div class="card-detail">🗓 {{ f.fecha_emision|default:"Sin fecha" }}</div>
-            <div class="card-detail">🔷 Timbrado: {{ f.timbrado|default:"—" }}</div>
+            <div class="card-detail">🔷 Timbrado: {{ f.timbrado|default:"—" }} {% if f.numero_factura %}| N°: {{ f.numero_factura }}{% endif %}</div>
             <div class="card-detail">📋 RUC: {{ f.ruc|default:"—" }}</div>
             {% if f.importe_impuesto %}
             <div class="card-detail">🏷 IVA/Impuesto: Gs. {{ f.importe_impuesto|floatformat:0 }}</div>
@@ -424,6 +440,10 @@
             {% if f.carga_manual %}
             <span class="badge badge-manual">✏️ Manual</span>
             {% endif %}
+            <div class="card-actions">
+                <button class="btn-edit" onclick="abrirEditarFactura({{ f.id }})">✏️ Editar</button>
+                <button class="btn-delete" onclick="eliminarFactura({{ f.id }}, '{{ f.nombre_proveedor|escapejs }}')">🗑 Eliminar</button>
+            </div>
         </div>
         {% endfor %}
     {% else %}
@@ -494,41 +514,130 @@
 </div>
 
 <!-- ══════════════════════════════════════
-     MODAL EXPORTACIÓN EXCEL
+     MODAL EDITAR FACTURA
 ══════════════════════════════════════ -->
-<div class="modal-overlay" id="modalExcel">
+<div class="modal-overlay" id="modalEditFactura">
     <div class="modal-box">
-        <h2>📥 Exportar Gastos a Excel</h2>
-        <p class="subtitle">Filtrá por período. Si no seleccionás fechas, se exportan todos los registros.</p>
+        <h2>✏️ Editar Factura</h2>
+        <p class="subtitle">Modificá los datos y guardá los cambios.</p>
+        <input type="hidden" id="ef_id">
 
         <div class="form-row">
             <div class="form-group">
-                <label>Desde</label>
-                <input type="date" id="xlDesde">
+                <label>Proveedor</label>
+                <input type="text" id="ef_proveedor" placeholder="Nombre del proveedor">
             </div>
             <div class="form-group">
-                <label>Hasta</label>
-                <input type="date" id="xlHasta">
+                <label>RUC</label>
+                <input type="text" id="ef_ruc" placeholder="Ej: 80012345-1">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Timbrado</label>
+                <input type="text" id="ef_timbrado">
+            </div>
+            <div class="form-group">
+                <label>N° Factura</label>
+                <input type="text" id="ef_numero_factura" placeholder="001-001-0000001">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Fecha Emisión</label>
+                <input type="date" id="ef_fecha">
+            </div>
+            <div class="form-group">
+                <label>Tipo</label>
+                <select id="ef_tipo">
+                    <option value="electronica">Electrónica</option>
+                    <option value="no_electronica">No Electrónica</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Importe Total (Gs.)</label>
+                <input type="number" id="ef_importe" placeholder="0">
+            </div>
+            <div class="form-group">
+                <label>IVA / Impuesto (Gs.)</label>
+                <input type="number" id="ef_impuesto" placeholder="0">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Estado</label>
+                <select id="ef_estado">
+                    <option value="pendiente">Pendiente</option>
+                    <option value="pagada">Pagada</option>
+                    <option value="vencida">Vencida</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Notas</label>
+                <input type="text" id="ef_notas" placeholder="Observaciones">
             </div>
         </div>
 
-        {% if request.user.is_superuser %}
-        <div class="form-group" id="xlGrupoUsuario">
-            <label>Usuario (opcional)</label>
-            <select id="xlUsuario">
-                <option value="">— Todos los usuarios —</option>
-            </select>
+        <div class="loading" id="loadingEditFactura">
+            <span class="spinner"></span> Guardando...
         </div>
-        {% endif %}
+        <div class="btn-row" style="margin-top:16px;">
+            <button class="btn-cancelar" onclick="cerrarModalEditFactura()">✖ Cancelar</button>
+            <button class="btn-confirmar" onclick="guardarEdicionFactura()">✅ Guardar Cambios</button>
+        </div>
+    </div>
+</div>
 
-        <button class="btn-confirmar verde" style="width:100%; margin-top:8px;"
-                onclick="descargarExcel()">
-            📥 Descargar Excel
-        </button>
-        <button class="btn-cancelar" style="width:100%; margin-top:8px; text-align:center;"
-                onclick="cerrarModalExcel()">
-            Cancelar
-        </button>
+<!-- ══════════════════════════════════════
+     MODAL EDITAR INGRESO
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="modalEditIngreso">
+    <div class="modal-box">
+        <h2>✏️ Editar Ingreso</h2>
+        <p class="subtitle">Modificá los datos y guardá los cambios.</p>
+        <input type="hidden" id="ei_id">
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Descripción *</label>
+                <input type="text" id="ei_descripcion" placeholder="Descripción">
+            </div>
+            <div class="form-group">
+                <label>Monto (Gs.) *</label>
+                <input type="number" id="ei_monto" placeholder="0">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Categoría</label>
+                <select id="ei_categoria">
+                    <option value="sueldo">Sueldo</option>
+                    <option value="freelance">Freelance</option>
+                    <option value="venta">Venta</option>
+                    <option value="alquiler">Alquiler</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="otro">Otro</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Fecha *</label>
+                <input type="date" id="ei_fecha">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Notas</label>
+            <input type="text" id="ei_notas" placeholder="Observaciones opcionales">
+        </div>
+
+        <div class="loading" id="loadingEditIngreso">
+            <span class="spinner"></span> Guardando...
+        </div>
+        <div class="btn-row" style="margin-top:16px;">
+            <button class="btn-cancelar" onclick="cerrarModalEditIngreso()">✖ Cancelar</button>
+            <button class="btn-confirmar verde" onclick="guardarEdicionIngreso()">✅ Guardar Cambios</button>
+        </div>
     </div>
 </div>
 
@@ -957,7 +1066,10 @@ async function cargarListaIngresos() {
             sueldo: '💼', freelance: '💻', venta: '🛒',
             alquiler: '🏠', transferencia: '🔄', otro: '💰'
         };
-        contenedor.innerHTML = ingresos.map(i => `
+        contenedor.innerHTML = ingresos.map(i => {
+            const datos = encodeURIComponent(JSON.stringify(i));
+            const descEsc = i.descripcion.replace(/'/g, "\\'");
+            return `
             <div class="ingreso-card">
                 <div class="card-header">
                     <div class="card-title">
@@ -968,53 +1080,21 @@ async function cargarListaIngresos() {
                 <div class="card-detail">🗓 ${i.fecha}</div>
                 ${i.notas ? `<div class="card-detail">📝 ${i.notas}</div>` : ''}
                 <span class="badge badge-ingreso">${i.categoria}</span>
-            </div>
-        `).join('');
+                <div class="card-actions">
+                    <button class="btn-edit"
+                        onclick="abrirEditarIngreso(JSON.parse(decodeURIComponent('${datos}')))">
+                        ✏️ Editar
+                    </button>
+                    <button class="btn-delete"
+                        onclick="eliminarIngreso(${i.id}, '${descEsc}')">
+                        🗑 Eliminar
+                    </button>
+                </div>
+            </div>`;
+        }).join('');
     } catch(e) {
         contenedor.innerHTML = '<div class="empty-state"><span>⚠️</span><p>Error al cargar ingresos.</p></div>';
     }
-}
-
-// ══════════════════════════════════════
-// EXPORTACIÓN EXCEL
-// ══════════════════════════════════════
-function abrirModalExcel() {
-    // Pre-cargar usuarios si es superuser
-    const selXl = document.getElementById('xlUsuario');
-    if (selXl && selXl.options.length === 1 && usuariosCache.length) {
-        usuariosCache.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u.id;
-            const nombre = (u.first_name || u.last_name)
-                ? `${u.first_name} ${u.last_name}`.trim()
-                : u.username;
-            opt.textContent = `${nombre} (@${u.username})`;
-            selXl.appendChild(opt);
-        });
-    }
-    document.getElementById('modalExcel').classList.add('open');
-}
-
-function cerrarModalExcel() {
-    document.getElementById('modalExcel').classList.remove('open');
-}
-
-function descargarExcel() {
-    const desde  = document.getElementById('xlDesde').value;
-    const hasta  = document.getElementById('xlHasta').value;
-    const selXl  = document.getElementById('xlUsuario');
-    const uId    = selXl ? selXl.value : '';
-
-    let url = '/api/facturas/exportar-excel/?';
-    const params = new URLSearchParams();
-    if (desde) params.set('desde', desde);
-    if (hasta) params.set('hasta', hasta);
-    if (uId)   params.set('usuario_id', uId);
-    url += params.toString();
-
-    // Abrir en la misma ventana — el navegador descarga el archivo automáticamente
-    window.location.href = url;
-    cerrarModalExcel();
 }
 
 // ══════════════════════════════════════
@@ -1115,6 +1195,188 @@ function _renderErrores(lista) {
     return '<ul class="csv-error-list">'
         + lista.map(e => `<li>Fila ${e.fila}: ${e.error}</li>`).join('')
         + '</ul>';
+}
+
+// ══════════════════════════════════════
+// EDITAR / ELIMINAR FACTURAS
+// ══════════════════════════════════════
+async function abrirEditarFactura(id) {
+    try {
+        const res = await fetch(`/api/facturas/${id}/`, {
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        });
+        if (!res.ok) { alert('No se pudo cargar la factura.'); return; }
+        const f = await res.json();
+
+        document.getElementById('ef_id').value             = f.id;
+        document.getElementById('ef_proveedor').value      = f.nombre_proveedor || '';
+        document.getElementById('ef_ruc').value            = f.ruc || '';
+        document.getElementById('ef_timbrado').value       = f.timbrado || '';
+        document.getElementById('ef_numero_factura').value = f.numero_factura || '';
+        document.getElementById('ef_fecha').value          = f.fecha_emision || '';
+        document.getElementById('ef_tipo').value           = f.tipo || 'electronica';
+        document.getElementById('ef_importe').value        = f.importe_total || '';
+        document.getElementById('ef_impuesto').value       = f.importe_impuesto || '';
+        document.getElementById('ef_estado').value         = f.estado || 'pendiente';
+        document.getElementById('ef_notas').value          = f.notas || '';
+
+        document.getElementById('loadingEditFactura').style.display = 'none';
+        document.getElementById('modalEditFactura').classList.add('open');
+    } catch(e) {
+        alert('Error de conexión.');
+    }
+}
+
+function cerrarModalEditFactura() {
+    document.getElementById('modalEditFactura').classList.remove('open');
+}
+
+async function guardarEdicionFactura() {
+    const id = document.getElementById('ef_id').value;
+    const body = {
+        nombre_proveedor: document.getElementById('ef_proveedor').value,
+        ruc:              document.getElementById('ef_ruc').value,
+        timbrado:         document.getElementById('ef_timbrado').value,
+        numero_factura:   document.getElementById('ef_numero_factura').value,
+        fecha_emision:    document.getElementById('ef_fecha').value || null,
+        tipo:             document.getElementById('ef_tipo').value,
+        importe_total:    document.getElementById('ef_importe').value || null,
+        importe_impuesto: document.getElementById('ef_impuesto').value || null,
+        estado:           document.getElementById('ef_estado').value,
+        notas:            document.getElementById('ef_notas').value,
+    };
+
+    document.getElementById('loadingEditFactura').style.display = 'block';
+    document.querySelectorAll('#modalEditFactura .btn-confirmar, #modalEditFactura .btn-cancelar')
+        .forEach(b => b.disabled = true);
+
+    try {
+        const res = await fetch(`/api/facturas/${id}/`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify(body),
+        });
+        if (res.ok) {
+            cerrarModalEditFactura();
+            window.location.reload();
+        } else {
+            const data = await res.json();
+            alert('Error: ' + JSON.stringify(data));
+            document.getElementById('loadingEditFactura').style.display = 'none';
+            document.querySelectorAll('#modalEditFactura .btn-confirmar, #modalEditFactura .btn-cancelar')
+                .forEach(b => b.disabled = false);
+        }
+    } catch(e) {
+        alert('Error de conexión.');
+        document.getElementById('loadingEditFactura').style.display = 'none';
+        document.querySelectorAll('#modalEditFactura .btn-confirmar, #modalEditFactura .btn-cancelar')
+            .forEach(b => b.disabled = false);
+    }
+}
+
+async function eliminarFactura(id, nombre) {
+    if (!confirm(`¿Eliminar la factura de "${nombre}"?\nEsta acción no se puede deshacer.`)) return;
+    try {
+        const res = await fetch(`/api/facturas/${id}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            alert('No se pudo eliminar la factura.');
+        }
+    } catch(e) {
+        alert('Error de conexión.');
+    }
+}
+
+// ══════════════════════════════════════
+// EDITAR / ELIMINAR INGRESOS
+// ══════════════════════════════════════
+function abrirEditarIngreso(ingreso) {
+    document.getElementById('ei_id').value          = ingreso.id;
+    document.getElementById('ei_descripcion').value = ingreso.descripcion || '';
+    document.getElementById('ei_monto').value       = ingreso.monto || '';
+    document.getElementById('ei_categoria').value   = ingreso.categoria || 'otro';
+    document.getElementById('ei_fecha').value       = ingreso.fecha || '';
+    document.getElementById('ei_notas').value       = ingreso.notas || '';
+
+    document.getElementById('loadingEditIngreso').style.display = 'none';
+    document.getElementById('modalEditIngreso').classList.add('open');
+}
+
+function cerrarModalEditIngreso() {
+    document.getElementById('modalEditIngreso').classList.remove('open');
+}
+
+async function guardarEdicionIngreso() {
+    const id = document.getElementById('ei_id').value;
+    const desc  = document.getElementById('ei_descripcion').value.trim();
+    const monto = document.getElementById('ei_monto').value;
+    const fecha = document.getElementById('ei_fecha').value;
+    if (!desc || !monto || !fecha) {
+        alert('Completá descripción, monto y fecha.');
+        return;
+    }
+
+    document.getElementById('loadingEditIngreso').style.display = 'block';
+    document.querySelectorAll('#modalEditIngreso .btn-confirmar, #modalEditIngreso .btn-cancelar')
+        .forEach(b => b.disabled = true);
+
+    try {
+        const res = await fetch(`/api/ingresos/${id}/`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({
+                descripcion: desc,
+                monto:       monto,
+                categoria:   document.getElementById('ei_categoria').value,
+                fecha:       fecha,
+                notas:       document.getElementById('ei_notas').value,
+            }),
+        });
+        if (res.ok) {
+            cerrarModalEditIngreso();
+            cargarListaIngresos();
+            cargarDashboard();
+        } else {
+            const data = await res.json();
+            alert('Error: ' + JSON.stringify(data));
+            document.getElementById('loadingEditIngreso').style.display = 'none';
+            document.querySelectorAll('#modalEditIngreso .btn-confirmar, #modalEditIngreso .btn-cancelar')
+                .forEach(b => b.disabled = false);
+        }
+    } catch(e) {
+        alert('Error de conexión.');
+        document.getElementById('loadingEditIngreso').style.display = 'none';
+        document.querySelectorAll('#modalEditIngreso .btn-confirmar, #modalEditIngreso .btn-cancelar')
+            .forEach(b => b.disabled = false);
+    }
+}
+
+async function eliminarIngreso(id, descripcion) {
+    if (!confirm(`¿Eliminar el ingreso "${descripcion}"?\nEsta acción no se puede deshacer.`)) return;
+    try {
+        const res = await fetch(`/api/ingresos/${id}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        });
+        if (res.ok) {
+            cargarListaIngresos();
+            cargarDashboard();
+        } else {
+            alert('No se pudo eliminar el ingreso.');
+        }
+    } catch(e) {
+        alert('Error de conexión.');
+    }
 }
 
 // ══════════════════════════════════════

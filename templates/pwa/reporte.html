@@ -2,6 +2,13 @@
 {% block content %}
 <style>
 /* ═══════════════════════════════════════
+   OVERRIDE: ancho amplio solo en esta página
+═══════════════════════════════════════ */
+@media (min-width: 640px) {
+    .container { max-width: 1280px !important; padding: 20px 28px !important; }
+}
+
+/* ═══════════════════════════════════════
    TABS PRINCIPALES
 ═══════════════════════════════════════ */
 .page-tabs {

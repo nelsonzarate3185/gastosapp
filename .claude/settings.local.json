@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venv/Scripts/python.exe manage.py check)",
+      "Bash(grep -E \"\\\\.py$\")"
+    ]
+  }
+}
