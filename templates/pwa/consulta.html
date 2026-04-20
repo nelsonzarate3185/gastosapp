@@ -1,0 +1,1090 @@
+{% extends 'pwa/base.html' %}
+{% block content %}
+<style>
+/* ═══════════════════════════════════════
+   OVERRIDE: ancho amplio en desktop
+═══════════════════════════════════════ */
+@media (min-width: 640px) {
+    .container { max-width: 1280px !important; padding: 20px 28px !important; }
+}
+
+/* ═══════════════════════════════════════
+   TIPO TOGGLE
+═══════════════════════════════════════ */
+.tipo-toggle {
+    display: flex; gap: 8px; margin-bottom: 16px;
+    background: white; border-radius: 14px; padding: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.tipo-reg-btn {
+    flex: 1; padding: 10px 6px; border: none; border-radius: 10px;
+    background: transparent; font-size: 12px; font-weight: 600;
+    color: #888; cursor: pointer; transition: all 0.2s;
+}
+.tipo-reg-btn.active { background: #1a73e8; color: white; }
+
+/* ═══════════════════════════════════════
+   FILTROS
+═══════════════════════════════════════ */
+.filtros-card {
+    background: white; border-radius: 14px; padding: 16px;
+    margin-bottom: 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+}
+.filtros-card h2 { font-size: 14px; font-weight: 700; color: #333; margin-bottom: 12px; }
+.filtros-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;
+}
+.filtros-grid.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+.filtros-grid.full  { grid-template-columns: 1fr; }
+.filtro-group label {
+    display: block; font-size: 11px; font-weight: 600;
+    color: #666; margin-bottom: 4px; text-transform: uppercase;
+}
+.filtro-group input,
+.filtro-group select {
+    width: 100%; padding: 9px 12px; border: 1.5px solid #e0e0e0;
+    border-radius: 10px; font-size: 13px; color: #333;
+    background: white; box-sizing: border-box;
+}
+.filtro-group input:focus,
+.filtro-group select:focus { outline: none; border-color: #1a73e8; }
+.filtros-acciones { display: flex; gap: 8px; margin-top: 10px; }
+.btn-filtrar {
+    flex: 1; padding: 10px; background: #1a73e8; color: white;
+    border: none; border-radius: 10px; font-size: 13px;
+    font-weight: 700; cursor: pointer;
+}
+.btn-limpiar {
+    padding: 10px 14px; background: #f5f5f5; color: #666;
+    border: none; border-radius: 10px; font-size: 13px;
+    font-weight: 600; cursor: pointer;
+}
+
+/* ═══════════════════════════════════════
+   TOTALIZADOR
+═══════════════════════════════════════ */
+.total-bar {
+    background: #fff3e0; border-radius: 12px; padding: 12px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px; font-size: 13px; font-weight: 700;
+}
+.total-bar .t-label { color: #666; }
+.total-bar .t-valor { color: #e65100; font-size: 16px; }
+.total-bar.ingresos-bar { background: #e6f4ea; }
+.total-bar.ingresos-bar .t-valor { color: #137333; }
+
+/* ═══════════════════════════════════════
+   TABLA
+═══════════════════════════════════════ */
+.tabla-card {
+    background: white; border-radius: 14px; padding: 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.07); margin-bottom: 14px;
+    overflow-x: auto;
+}
+.tabla-card h3 { font-size: 14px; font-weight: 700; color: #333; margin-bottom: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 360px; }
+thead th {
+    text-align: left; padding: 8px 10px;
+    background: #f8f9fa; color: #555; font-size: 11px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+    border-bottom: 2px solid #e0e0e0; white-space: nowrap;
+}
+tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
+tbody tr:hover { background: #fafafa; }
+tbody td { padding: 8px 10px; color: #444; vertical-align: middle; }
+td.amt-gasto  { text-align: right; color: #ea4335; font-weight: 700; }
+td.amt-ingreso { text-align: right; color: #34a853; font-weight: 700; }
+td.text-right { text-align: right; }
+
+/* ═══════════════════════════════════════
+   BADGES
+═══════════════════════════════════════ */
+.badge-sm {
+    display: inline-block; padding: 2px 7px; border-radius: 20px;
+    font-size: 10px; font-weight: 700;
+}
+.badge-tipo-e  { background: #e8f0fe; color: #1a73e8; }
+.badge-tipo-ne { background: #fff8e1; color: #f57f17; }
+.badge-tipo-ing { background: #e6f4ea; color: #137333; }
+.badge-cat {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 10px; font-weight: 600;
+    background: #f3e5f5; color: #6a1b9a;
+}
+.badge-gasto {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 10px; font-weight: 600;
+    background: #fce8e6; color: #c5221f;
+}
+.badge-ingreso {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 10px; font-weight: 600;
+    background: #e6f4ea; color: #137333;
+}
+
+/* ═══════════════════════════════════════
+   ACCIONES
+═══════════════════════════════════════ */
+.acciones-btns { display: flex; gap: 5px; }
+.btn-accion {
+    padding: 5px 9px; border: none; border-radius: 8px;
+    font-size: 13px; cursor: pointer; transition: opacity 0.15s;
+}
+.btn-accion:hover { opacity: 0.8; }
+.btn-accion.editar  { background: #e8f0fe; color: #1a73e8; }
+.btn-accion.eliminar { background: #fce8e6; color: #ea4335; }
+
+/* ═══════════════════════════════════════
+   PAGINACIÓN
+═══════════════════════════════════════ */
+.paginacion {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 12px; font-size: 13px; color: #555;
+}
+.paginacion-btns { display: flex; gap: 6px; }
+.btn-pag {
+    padding: 7px 14px; border: 1.5px solid #e0e0e0; border-radius: 8px;
+    background: white; font-size: 12px; font-weight: 600; cursor: pointer;
+    color: #1a73e8; transition: background 0.15s;
+}
+.btn-pag:hover { background: #e8f0fe; }
+.btn-pag:disabled { color: #bbb; cursor: default; background: white; }
+
+/* ═══════════════════════════════════════
+   ESTADOS
+═══════════════════════════════════════ */
+.loading-overlay {
+    text-align: center; padding: 40px 20px; color: #1a73e8;
+    font-weight: 600; font-size: 14px;
+}
+.spinner {
+    display: inline-block; width: 20px; height: 20px;
+    border: 3px solid #e8f0fe; border-top-color: #1a73e8;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    margin-right: 8px; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty-state { text-align: center; padding: 40px 20px; color: #aaa; }
+.empty-state span { font-size: 40px; display: block; margin-bottom: 10px; }
+
+/* ═══════════════════════════════════════
+   MODALES
+═══════════════════════════════════════ */
+.modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5); z-index: 200;
+    align-items: center; justify-content: center; padding: 16px;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+    background: white; border-radius: 20px; padding: 24px;
+    width: 100%; max-width: 520px; max-height: 90vh;
+    overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+.modal-box h2 { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 4px; }
+.modal-box .subtitle { font-size: 13px; color: #888; margin-bottom: 20px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.form-group { margin-bottom: 12px; }
+.form-group label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: #555; margin-bottom: 5px; text-transform: uppercase;
+}
+.form-group input,
+.form-group select {
+    width: 100%; padding: 10px 12px; border: 1.5px solid #e0e0e0;
+    border-radius: 10px; font-size: 14px; color: #333;
+    background: white; box-sizing: border-box;
+}
+.form-group input:focus,
+.form-group select:focus { outline: none; border-color: #1a73e8; }
+.btn-row { display: flex; gap: 10px; }
+.btn-cancelar {
+    flex: 1; padding: 12px; background: #f5f5f5; color: #555;
+    border: none; border-radius: 12px; font-size: 14px;
+    font-weight: 600; cursor: pointer;
+}
+.btn-confirmar {
+    flex: 2; padding: 12px; background: #1a73e8; color: white;
+    border: none; border-radius: 12px; font-size: 14px;
+    font-weight: 700; cursor: pointer;
+}
+.btn-confirmar.verde { background: #34a853; }
+.loading { display: none; text-align: center; padding: 10px; color: #1a73e8; font-size: 13px; }
+</style>
+
+<!-- HEADER -->
+<div style="margin-bottom:16px;">
+    <h1 style="font-size:20px;font-weight:800;color:#333;">🔍 Consulta de Registros</h1>
+    <p style="font-size:13px;color:#888;margin-top:4px;">Búsqueda avanzada, edición y eliminación de facturas e ingresos</p>
+</div>
+
+<!-- TIPO TOGGLE -->
+<div class="tipo-toggle">
+    <button class="tipo-reg-btn active" onclick="setTipo('gastos',this)">🧾 Gastos</button>
+    <button class="tipo-reg-btn" onclick="setTipo('ingresos',this)">💰 Ingresos</button>
+    <button class="tipo-reg-btn" onclick="setTipo('todos',this)">📋 Todos</button>
+</div>
+
+<!-- FILTROS -->
+<div class="filtros-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin-bottom:0;">🔍 Filtros</h2>
+    </div>
+
+    <!-- Rango de fechas (siempre visible) -->
+    <div class="filtros-grid">
+        <div class="filtro-group">
+            <label>Desde</label>
+            <input type="date" id="fDesde">
+        </div>
+        <div class="filtro-group">
+            <label>Hasta</label>
+            <input type="date" id="fHasta">
+        </div>
+    </div>
+
+    <!-- Filtros Gastos (facturas) -->
+    <div id="filtrosGastos">
+        <div class="filtros-grid">
+            <div class="filtro-group">
+                <label>N° Factura</label>
+                <input type="text" id="fNumeroFactura" placeholder="001-001-0000001">
+            </div>
+            <div class="filtro-group">
+                <label>Timbrado</label>
+                <input type="text" id="fTimbrado" placeholder="Número de timbrado">
+            </div>
+        </div>
+        <div class="filtros-grid">
+            <div class="filtro-group">
+                <label>RUC</label>
+                <input type="text" id="fRuc" placeholder="Búsqueda parcial">
+            </div>
+            <div class="filtro-group">
+                <label>Proveedor</label>
+                <input type="text" id="fProveedor" placeholder="Búsqueda parcial">
+            </div>
+        </div>
+        <div class="filtros-grid">
+            <div class="filtro-group">
+                <label>Tipo Factura</label>
+                <select id="fTipoFactura">
+                    <option value="">Todas</option>
+                    <option value="electronica">Electrónica</option>
+                    <option value="no_electronica">No Electrónica</option>
+                </select>
+            </div>
+            <div class="filtro-group" id="fGrupoUsuario" style="display:{% if request.user.is_superuser %}block{% else %}none{% endif %};">
+                <label>Usuario</label>
+                <select id="fUsuario">
+                    <option value="">— Todos los usuarios —</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros Ingresos -->
+    <div id="filtrosIngresos" style="display:none;">
+        <div class="filtros-grid">
+            <div class="filtro-group">
+                <label>Descripción</label>
+                <input type="text" id="fDescripcion" placeholder="Búsqueda parcial">
+            </div>
+            <div class="filtro-group">
+                <label>Categoría</label>
+                <select id="fCategoria">
+                    <option value="">Todas</option>
+                    <option value="sueldo">Sueldo</option>
+                    <option value="freelance">Freelance</option>
+                    <option value="venta">Venta</option>
+                    <option value="alquiler">Alquiler</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="otro">Otro</option>
+                </select>
+            </div>
+        </div>
+        <div class="filtros-grid full" id="fGrupoUsuarioIng" style="display:{% if request.user.is_superuser %}block{% else %}none{% endif %};">
+            <div class="filtro-group">
+                <label>Usuario</label>
+                <select id="fUsuarioIng">
+                    <option value="">— Todos los usuarios —</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="filtros-acciones">
+        <button class="btn-filtrar" onclick="buscar(1)">🔍 Buscar</button>
+        <button class="btn-limpiar" onclick="limpiarFiltros()">✕ Limpiar</button>
+    </div>
+</div>
+
+<!-- TOTALIZADOR -->
+<div id="totalizador" style="display:none;" class="total-bar">
+    <span class="t-label" id="totLabel">Total</span>
+    <span class="t-valor" id="totValor"></span>
+</div>
+
+<!-- RESULTADOS -->
+<div id="contenidoResultados">
+    <div class="empty-state">
+        <span>🔍</span>
+        <p>Seleccioná los filtros y hacé clic en <strong>Buscar</strong></p>
+    </div>
+</div>
+
+<!-- PAGINACIÓN -->
+<div class="paginacion" id="paginacion" style="display:none;">
+    <span id="pagInfoText" style="font-size:12px;color:#888;"></span>
+    <div class="paginacion-btns">
+        <button class="btn-pag" id="btnPrev" onclick="cambiarPag(-1)">‹ Anterior</button>
+        <button class="btn-pag" id="btnNext" onclick="cambiarPag(1)">Siguiente ›</button>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════
+     MODAL EDITAR FACTURA
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="modalEditFactura">
+    <div class="modal-box">
+        <h2>✏️ Editar Factura</h2>
+        <p class="subtitle">Modificá los datos y guardá los cambios.</p>
+        <input type="hidden" id="ef_id">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Proveedor</label>
+                <input type="text" id="ef_proveedor" placeholder="Nombre del proveedor">
+            </div>
+            <div class="form-group">
+                <label>RUC</label>
+                <input type="text" id="ef_ruc" placeholder="Ej: 80012345-1">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Timbrado</label>
+                <input type="text" id="ef_timbrado">
+            </div>
+            <div class="form-group">
+                <label>N° Factura</label>
+                <input type="text" id="ef_numero_factura" placeholder="001-001-0000001">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Fecha Emisión</label>
+                <input type="date" id="ef_fecha">
+            </div>
+            <div class="form-group">
+                <label>Tipo</label>
+                <select id="ef_tipo">
+                    <option value="electronica">Electrónica</option>
+                    <option value="no_electronica">No Electrónica</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Importe Total (Gs.)</label>
+                <input type="number" id="ef_importe" placeholder="0">
+            </div>
+            <div class="form-group">
+                <label>IVA / Impuesto (Gs.)</label>
+                <input type="number" id="ef_impuesto" placeholder="0">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Estado</label>
+                <select id="ef_estado">
+                    <option value="pendiente">Pendiente</option>
+                    <option value="pagada">Pagada</option>
+                    <option value="vencida">Vencida</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Notas</label>
+                <input type="text" id="ef_notas" placeholder="Observaciones">
+            </div>
+        </div>
+        <div class="loading" id="loadingEditFactura"><span class="spinner"></span> Guardando...</div>
+        <div class="btn-row" style="margin-top:16px;">
+            <button class="btn-cancelar" onclick="cerrarModalEditFactura()">✖ Cancelar</button>
+            <button class="btn-confirmar" onclick="guardarEdicionFactura()">✅ Guardar Cambios</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MODAL EDITAR INGRESO
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="modalEditIngreso">
+    <div class="modal-box">
+        <h2>✏️ Editar Ingreso</h2>
+        <p class="subtitle">Modificá los datos y guardá los cambios.</p>
+        <input type="hidden" id="ei_id">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Descripción *</label>
+                <input type="text" id="ei_descripcion" placeholder="Descripción">
+            </div>
+            <div class="form-group">
+                <label>Monto (Gs.) *</label>
+                <input type="number" id="ei_monto" placeholder="0">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Categoría</label>
+                <select id="ei_categoria">
+                    <option value="sueldo">Sueldo</option>
+                    <option value="freelance">Freelance</option>
+                    <option value="venta">Venta</option>
+                    <option value="alquiler">Alquiler</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="otro">Otro</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Fecha *</label>
+                <input type="date" id="ei_fecha">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Notas</label>
+            <input type="text" id="ei_notas" placeholder="Observaciones opcionales">
+        </div>
+        <div class="loading" id="loadingEditIngreso"><span class="spinner"></span> Guardando...</div>
+        <div class="btn-row" style="margin-top:16px;">
+            <button class="btn-cancelar" onclick="cerrarModalEditIngreso()">✖ Cancelar</button>
+            <button class="btn-confirmar verde" onclick="guardarEdicionIngreso()">✅ Guardar Cambios</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+// ══════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════
+let tipoActual   = 'gastos';
+let paginaActual = 1;
+let totalPaginas = 1;
+let todosCache   = null;
+let todosPageActual = 1;
+const TODOS_PAGE_SIZE = 25;
+
+// ══════════════════════════════════════
+// INIT
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    {% if request.user.is_superuser %}
+    cargarUsuarios();
+    {% endif %}
+});
+
+{% if request.user.is_superuser %}
+async function cargarUsuarios() {
+    try {
+        const res = await fetch('/api/usuarios/');
+        if (!res.ok) return;
+        const usuarios = await res.json();
+        const sel1 = document.getElementById('fUsuario');
+        const sel2 = document.getElementById('fUsuarioIng');
+        usuarios.forEach(u => {
+            const nombre = u.nombre || u.username;
+            const opt1 = new Option(nombre, u.id);
+            const opt2 = new Option(nombre, u.id);
+            sel1.appendChild(opt1);
+            sel2.appendChild(opt2);
+        });
+    } catch(e) {}
+}
+{% endif %}
+
+// ══════════════════════════════════════
+// TIPO TOGGLE
+// ══════════════════════════════════════
+function setTipo(tipo, btn) {
+    tipoActual = tipo;
+    document.querySelectorAll('.tipo-reg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const gF = document.getElementById('filtrosGastos');
+    const iF = document.getElementById('filtrosIngresos');
+
+    if (tipo === 'gastos') {
+        gF.style.display = 'block';
+        iF.style.display = 'none';
+    } else if (tipo === 'ingresos') {
+        gF.style.display = 'none';
+        iF.style.display = 'block';
+    } else {
+        gF.style.display = 'block';
+        iF.style.display = 'block';
+    }
+
+    limpiarResultados();
+}
+
+// ══════════════════════════════════════
+// LIMPIAR
+// ══════════════════════════════════════
+function limpiarFiltros() {
+    ['fDesde','fHasta','fNumeroFactura','fTimbrado','fRuc','fProveedor','fDescripcion'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    ['fTipoFactura','fCategoria','fUsuario','fUsuarioIng'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    limpiarResultados();
+}
+
+function limpiarResultados() {
+    document.getElementById('contenidoResultados').innerHTML =
+        '<div class="empty-state"><span>🔍</span><p>Seleccioná los filtros y hacé clic en <strong>Buscar</strong></p></div>';
+    document.getElementById('paginacion').style.display = 'none';
+    document.getElementById('totalizador').style.display = 'none';
+    todosCache = null;
+}
+
+// ══════════════════════════════════════
+// BUSCAR
+// ══════════════════════════════════════
+async function buscar(page) {
+    paginaActual = page || 1;
+    todosPageActual = 1;
+    document.getElementById('contenidoResultados').innerHTML =
+        '<div class="loading-overlay"><span class="spinner"></span> Buscando...</div>';
+    document.getElementById('paginacion').style.display = 'none';
+    document.getElementById('totalizador').style.display = 'none';
+
+    try {
+        if (tipoActual === 'gastos') {
+            await cargarGastos(paginaActual);
+        } else if (tipoActual === 'ingresos') {
+            await cargarIngresos(paginaActual);
+        } else {
+            await cargarTodos();
+        }
+    } catch(e) {
+        document.getElementById('contenidoResultados').innerHTML =
+            '<div class="empty-state"><span>⚠️</span><p>Error al cargar los datos. Intentá de nuevo.</p></div>';
+    }
+}
+
+function cambiarPag(delta) {
+    if (tipoActual === 'todos') {
+        const nueva = todosPageActual + delta;
+        if (nueva < 1 || nueva > Math.ceil((todosCache || []).length / TODOS_PAGE_SIZE)) return;
+        todosPageActual = nueva;
+        renderTablaTodosPagina();
+    } else {
+        const nueva = paginaActual + delta;
+        if (nueva < 1 || nueva > totalPaginas) return;
+        buscar(nueva);
+    }
+}
+
+// ══════════════════════════════════════
+// PARAMS HELPERS
+// ══════════════════════════════════════
+function buildGastosParams(page, pageSize) {
+    const p = new URLSearchParams();
+    p.set('page', page || 1);
+    p.set('page_size', pageSize || 50);
+    const v = id => (document.getElementById(id) || {}).value || '';
+    if (v('fDesde'))         p.set('desde', v('fDesde'));
+    if (v('fHasta'))         p.set('hasta', v('fHasta'));
+    if (v('fRuc').trim())    p.set('ruc', v('fRuc').trim());
+    if (v('fProveedor').trim()) p.set('proveedor', v('fProveedor').trim());
+    if (v('fTimbrado').trim())  p.set('timbrado', v('fTimbrado').trim());
+    if (v('fNumeroFactura').trim()) p.set('numero_factura', v('fNumeroFactura').trim());
+    if (v('fTipoFactura'))   p.set('tipo', v('fTipoFactura'));
+    {% if request.user.is_superuser %}
+    if (v('fUsuario'))       p.set('usuario_id', v('fUsuario'));
+    {% endif %}
+    return p;
+}
+
+function buildIngresosParams(page, pageSize) {
+    const p = new URLSearchParams();
+    p.set('paginar', '1');
+    p.set('page', page || 1);
+    p.set('page_size', pageSize || 50);
+    const v = id => (document.getElementById(id) || {}).value || '';
+    if (v('fDesde'))          p.set('desde', v('fDesde'));
+    if (v('fHasta'))          p.set('hasta', v('fHasta'));
+    if (v('fDescripcion').trim()) p.set('descripcion', v('fDescripcion').trim());
+    if (v('fCategoria'))      p.set('categoria', v('fCategoria'));
+    {% if request.user.is_superuser %}
+    if (v('fUsuarioIng'))     p.set('usuario_id', v('fUsuarioIng'));
+    {% endif %}
+    return p;
+}
+
+// ══════════════════════════════════════
+// CARGAR GASTOS
+// ══════════════════════════════════════
+async function cargarGastos(page) {
+    const res = await fetch(`/api/facturas/reporte-gastos/?${buildGastosParams(page, 50)}`);
+    if (!res.ok) throw new Error('Error en API gastos');
+    const data = await res.json();
+    renderTablaGastos(data);
+}
+
+function renderTablaGastos(data) {
+    if (!data.items || !data.items.length) {
+        document.getElementById('contenidoResultados').innerHTML =
+            '<div class="empty-state"><span>🧾</span><p>No se encontraron facturas con esos filtros.</p></div>';
+        return;
+    }
+
+    document.getElementById('totalizador').className = 'total-bar';
+    document.getElementById('totalizador').style.display = 'flex';
+    document.getElementById('totLabel').textContent = `${data.total} factura(s)`;
+    document.getElementById('totValor').textContent = `Gs. ${fmtNum(data.total_importe)}`;
+
+    const esAdmin = {% if request.user.is_superuser %}true{% else %}false{% endif %};
+    let html = `<div class="tabla-card"><div style="overflow-x:auto;"><table><thead><tr>
+        <th>Tipo</th>
+        <th>Fecha</th>
+        <th>N° Factura</th>
+        <th>Timbrado</th>
+        <th>RUC</th>
+        <th>Proveedor</th>
+        <th>Tipo Fact.</th>
+        <th style="text-align:right;">Importe (Gs.)</th>
+        ${esAdmin ? '<th>Usuario</th>' : ''}
+        <th>Acciones</th>
+    </tr></thead><tbody>`;
+
+    for (const f of data.items) {
+        const tipoBadge = f.tipo === 'Factura Electrónica'
+            ? `<span class="badge-sm badge-tipo-e">E</span>`
+            : `<span class="badge-sm badge-tipo-ne">NE</span>`;
+        html += `<tr>
+            <td><span class="badge-gasto">Gasto</span></td>
+            <td>${f.fecha_emision ? fmtFecha(f.fecha_emision) : '—'}</td>
+            <td>${esc(f.numero_factura) || '—'}</td>
+            <td>${esc(f.timbrado) || '—'}</td>
+            <td>${esc(f.ruc) || '—'}</td>
+            <td>${esc(f.nombre_proveedor) || '—'}</td>
+            <td>${tipoBadge}</td>
+            <td class="amt-gasto">${f.importe_total != null ? fmtNum(f.importe_total) : '—'}</td>
+            ${esAdmin ? `<td>${esc(f.usuario)}</td>` : ''}
+            <td><div class="acciones-btns">
+                <button class="btn-accion editar" onclick="abrirEditarFactura(${f.id})" title="Editar">✏️</button>
+                <button class="btn-accion eliminar" onclick="eliminarFactura(${f.id},'${escJS(f.nombre_proveedor)}')" title="Eliminar">🗑</button>
+            </div></td>
+        </tr>`;
+    }
+
+    html += `</tbody></table></div></div>`;
+    document.getElementById('contenidoResultados').innerHTML = html;
+
+    totalPaginas = data.pages || 1;
+    renderPaginacion(data.page, data.pages, data.total, 50);
+}
+
+// ══════════════════════════════════════
+// CARGAR INGRESOS
+// ══════════════════════════════════════
+async function cargarIngresos(page) {
+    const res = await fetch(`/api/ingresos/?${buildIngresosParams(page, 50)}`);
+    if (!res.ok) throw new Error('Error en API ingresos');
+    const data = await res.json();
+    renderTablaIngresos(data);
+}
+
+function renderTablaIngresos(data) {
+    if (!data.items || !data.items.length) {
+        document.getElementById('contenidoResultados').innerHTML =
+            '<div class="empty-state"><span>💰</span><p>No se encontraron ingresos con esos filtros.</p></div>';
+        return;
+    }
+
+    document.getElementById('totalizador').className = 'total-bar ingresos-bar';
+    document.getElementById('totalizador').style.display = 'flex';
+    document.getElementById('totLabel').textContent = `${data.total} ingreso(s)`;
+    document.getElementById('totValor').textContent = `Gs. ${fmtNum(data.total_monto)}`;
+
+    const esAdmin = {% if request.user.is_superuser %}true{% else %}false{% endif %};
+    let html = `<div class="tabla-card"><div style="overflow-x:auto;"><table><thead><tr>
+        <th>Tipo</th>
+        <th>Fecha</th>
+        <th>Descripción</th>
+        <th>Categoría</th>
+        <th style="text-align:right;">Monto (Gs.)</th>
+        ${esAdmin ? '<th>Usuario</th>' : ''}
+        <th>Acciones</th>
+    </tr></thead><tbody>`;
+
+    for (const i of data.items) {
+        html += `<tr>
+            <td><span class="badge-ingreso">Ingreso</span></td>
+            <td>${i.fecha ? fmtFecha(i.fecha) : '—'}</td>
+            <td>${esc(i.descripcion) || '—'}</td>
+            <td><span class="badge-cat">${esc(i.categoria_display || i.categoria)}</span></td>
+            <td class="amt-ingreso">${fmtNum(i.monto)}</td>
+            ${esAdmin ? `<td>${esc(i.usuario)}</td>` : ''}
+            <td><div class="acciones-btns">
+                <button class="btn-accion editar" onclick="abrirEditarIngreso(${i.id})" title="Editar">✏️</button>
+                <button class="btn-accion eliminar" onclick="eliminarIngreso(${i.id},'${escJS(i.descripcion)}')" title="Eliminar">🗑</button>
+            </div></td>
+        </tr>`;
+    }
+
+    html += `</tbody></table></div></div>`;
+    document.getElementById('contenidoResultados').innerHTML = html;
+
+    totalPaginas = data.pages || 1;
+    renderPaginacion(data.page, data.pages, data.total, 50);
+}
+
+// ══════════════════════════════════════
+// CARGAR TODOS (combinado)
+// ══════════════════════════════════════
+async function cargarTodos() {
+    const gParams = buildGastosParams(1, 200);
+    const iParams = buildIngresosParams(1, 200);
+
+    const [gRes, iRes] = await Promise.all([
+        fetch(`/api/facturas/reporte-gastos/?${gParams}`),
+        fetch(`/api/ingresos/?${iParams}`)
+    ]);
+    if (!gRes.ok || !iRes.ok) throw new Error('Error en APIs');
+
+    const gData = await gRes.json();
+    const iData = await iRes.json();
+
+    const gastos   = (gData.items || []).map(f => ({ ...f, _tipo: 'gasto' }));
+    const ingresos = (iData.items || []).map(i => ({ ...i, _tipo: 'ingreso' }));
+
+    todosCache = [...gastos, ...ingresos].sort((a, b) => {
+        const da = a.fecha_emision || a.fecha || '';
+        const db = b.fecha_emision || b.fecha || '';
+        return db.localeCompare(da);
+    });
+
+    todosPageActual = 1;
+
+    if (!todosCache.length) {
+        document.getElementById('contenidoResultados').innerHTML =
+            '<div class="empty-state"><span>📋</span><p>No se encontraron registros con esos filtros.</p></div>';
+        return;
+    }
+
+    const totGastos   = gData.total_importe || 0;
+    const totIngresos = iData.total_monto   || 0;
+    const balance     = totIngresos - totGastos;
+    document.getElementById('totalizador').className = 'total-bar' + (balance >= 0 ? ' ingresos-bar' : '');
+    document.getElementById('totalizador').style.display = 'flex';
+    document.getElementById('totLabel').textContent =
+        `${todosCache.length} registro(s) | Ing: Gs. ${fmtNum(totIngresos)} | Gas: Gs. ${fmtNum(totGastos)}`;
+    document.getElementById('totValor').textContent = `Balance: Gs. ${fmtNum(Math.abs(balance))}`;
+
+    renderTablaTodosPagina();
+}
+
+function renderTablaTodosPagina() {
+    const data = todosCache || [];
+    const totalPags = Math.ceil(data.length / TODOS_PAGE_SIZE);
+    const offset    = (todosPageActual - 1) * TODOS_PAGE_SIZE;
+    const slice     = data.slice(offset, offset + TODOS_PAGE_SIZE);
+
+    const esAdmin = {% if request.user.is_superuser %}true{% else %}false{% endif %};
+    let html = `<div class="tabla-card"><div style="overflow-x:auto;"><table><thead><tr>
+        <th>Tipo</th>
+        <th>Fecha</th>
+        <th>Descripción / Proveedor</th>
+        <th>N° Fact. / Categoría</th>
+        <th>RUC</th>
+        <th style="text-align:right;">Importe (Gs.)</th>
+        ${esAdmin ? '<th>Usuario</th>' : ''}
+        <th>Acciones</th>
+    </tr></thead><tbody>`;
+
+    for (const r of slice) {
+        if (r._tipo === 'gasto') {
+            const tipoBadge = r.tipo === 'Factura Electrónica'
+                ? `<span class="badge-sm badge-tipo-e">E</span>`
+                : `<span class="badge-sm badge-tipo-ne">NE</span>`;
+            html += `<tr>
+                <td><span class="badge-gasto">Gasto</span></td>
+                <td>${r.fecha_emision ? fmtFecha(r.fecha_emision) : '—'}</td>
+                <td>${esc(r.nombre_proveedor) || '—'}</td>
+                <td>${esc(r.numero_factura) || '—'} ${tipoBadge}</td>
+                <td>${esc(r.ruc) || '—'}</td>
+                <td class="amt-gasto">${r.importe_total != null ? fmtNum(r.importe_total) : '—'}</td>
+                ${esAdmin ? `<td>${esc(r.usuario)}</td>` : ''}
+                <td><div class="acciones-btns">
+                    <button class="btn-accion editar" onclick="abrirEditarFactura(${r.id})" title="Editar">✏️</button>
+                    <button class="btn-accion eliminar" onclick="eliminarFactura(${r.id},'${escJS(r.nombre_proveedor)}')" title="Eliminar">🗑</button>
+                </div></td>
+            </tr>`;
+        } else {
+            html += `<tr>
+                <td><span class="badge-ingreso">Ingreso</span></td>
+                <td>${r.fecha ? fmtFecha(r.fecha) : '—'}</td>
+                <td>${esc(r.descripcion) || '—'}</td>
+                <td><span class="badge-cat">${esc(r.categoria_display || r.categoria)}</span></td>
+                <td>—</td>
+                <td class="amt-ingreso">${fmtNum(r.monto)}</td>
+                ${esAdmin ? `<td>${esc(r.usuario)}</td>` : ''}
+                <td><div class="acciones-btns">
+                    <button class="btn-accion editar" onclick="abrirEditarIngreso(${r.id})" title="Editar">✏️</button>
+                    <button class="btn-accion eliminar" onclick="eliminarIngreso(${r.id},'${escJS(r.descripcion)}')" title="Eliminar">🗑</button>
+                </div></td>
+            </tr>`;
+        }
+    }
+
+    html += `</tbody></table></div></div>`;
+    document.getElementById('contenidoResultados').innerHTML = html;
+
+    const pag = document.getElementById('paginacion');
+    if (totalPags > 1) {
+        pag.style.display = 'flex';
+        document.getElementById('pagInfoText').textContent =
+            `Página ${todosPageActual} de ${totalPags} (${data.length} registros)`;
+        document.getElementById('btnPrev').disabled = todosPageActual <= 1;
+        document.getElementById('btnNext').disabled = todosPageActual >= totalPags;
+    } else {
+        pag.style.display = 'none';
+    }
+}
+
+// ══════════════════════════════════════
+// PAGINACIÓN
+// ══════════════════════════════════════
+function renderPaginacion(page, pages, total, pageSize) {
+    const pag = document.getElementById('paginacion');
+    if (!pages || pages <= 1) {
+        pag.style.display = 'none';
+        return;
+    }
+    pag.style.display = 'flex';
+    document.getElementById('pagInfoText').textContent =
+        `Página ${page} de ${pages} (${total} registros)`;
+    document.getElementById('btnPrev').disabled = page <= 1;
+    document.getElementById('btnNext').disabled = page >= pages;
+    totalPaginas = pages;
+}
+
+// ══════════════════════════════════════
+// EDITAR FACTURA
+// ══════════════════════════════════════
+async function abrirEditarFactura(id) {
+    try {
+        const res = await fetch(`/api/facturas/${id}/`, {
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        });
+        if (!res.ok) { alert('No se pudo cargar la factura.'); return; }
+        const f = await res.json();
+        document.getElementById('ef_id').value             = f.id;
+        document.getElementById('ef_proveedor').value      = f.nombre_proveedor || '';
+        document.getElementById('ef_ruc').value            = f.ruc || '';
+        document.getElementById('ef_timbrado').value       = f.timbrado || '';
+        document.getElementById('ef_numero_factura').value = f.numero_factura || '';
+        document.getElementById('ef_fecha').value          = f.fecha_emision || '';
+        document.getElementById('ef_tipo').value           = f.tipo || 'electronica';
+        document.getElementById('ef_importe').value        = f.importe_total || '';
+        document.getElementById('ef_impuesto').value       = f.importe_impuesto || '';
+        document.getElementById('ef_estado').value         = f.estado || 'pendiente';
+        document.getElementById('ef_notas').value          = f.notas || '';
+        document.getElementById('loadingEditFactura').style.display = 'none';
+        document.getElementById('modalEditFactura').classList.add('open');
+    } catch(e) {
+        alert('Error de conexión.');
+    }
+}
+
+function cerrarModalEditFactura() {
+    document.getElementById('modalEditFactura').classList.remove('open');
+}
+
+async function guardarEdicionFactura() {
+    const id = document.getElementById('ef_id').value;
+    const body = {
+        nombre_proveedor: document.getElementById('ef_proveedor').value,
+        ruc:              document.getElementById('ef_ruc').value,
+        timbrado:         document.getElementById('ef_timbrado').value,
+        numero_factura:   document.getElementById('ef_numero_factura').value,
+        fecha_emision:    document.getElementById('ef_fecha').value || null,
+        tipo:             document.getElementById('ef_tipo').value,
+        importe_total:    document.getElementById('ef_importe').value || null,
+        importe_impuesto: document.getElementById('ef_impuesto').value || null,
+        estado:           document.getElementById('ef_estado').value,
+        notas:            document.getElementById('ef_notas').value,
+    };
+    document.getElementById('loadingEditFactura').style.display = 'block';
+    document.querySelectorAll('#modalEditFactura .btn-confirmar, #modalEditFactura .btn-cancelar')
+        .forEach(b => b.disabled = true);
+    try {
+        const res = await fetch(`/api/facturas/${id}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify(body),
+        });
+        if (res.ok) {
+            cerrarModalEditFactura();
+            buscar(paginaActual);
+        } else {
+            const data = await res.json();
+            alert('Error: ' + JSON.stringify(data));
+        }
+    } catch(e) {
+        alert('Error de conexión.');
+    }
+    document.getElementById('loadingEditFactura').style.display = 'none';
+    document.querySelectorAll('#modalEditFactura .btn-confirmar, #modalEditFactura .btn-cancelar')
+        .forEach(b => b.disabled = false);
+}
+
+async function eliminarFactura(id, nombre) {
+    if (!confirm(`¿Eliminar la factura de "${nombre}"?\nEsta acción no se puede deshacer.`)) return;
+    try {
+        const res = await fetch(`/api/facturas/${id}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        });
+        if (res.ok) {
+            buscar(paginaActual);
+        } else {
+            alert('No se pudo eliminar la factura.');
+        }
+    } catch(e) {
+        alert('Error de conexión.');
+    }
+}
+
+// ══════════════════════════════════════
+// EDITAR INGRESO
+// ══════════════════════════════════════
+async function abrirEditarIngreso(id) {
+    try {
+        const res = await fetch(`/api/ingresos/${id}/`, {
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        });
+        if (!res.ok) { alert('No se pudo cargar el ingreso.'); return; }
+        const i = await res.json();
+        document.getElementById('ei_id').value          = i.id;
+        document.getElementById('ei_descripcion').value = i.descripcion || '';
+        document.getElementById('ei_monto').value       = i.monto || '';
+        document.getElementById('ei_categoria').value   = i.categoria || 'otro';
+        document.getElementById('ei_fecha').value       = i.fecha || '';
+        document.getElementById('ei_notas').value       = i.notas || '';
+        document.getElementById('loadingEditIngreso').style.display = 'none';
+        document.getElementById('modalEditIngreso').classList.add('open');
+    } catch(e) {
+        alert('Error de conexión.');
+    }
+}
+
+function cerrarModalEditIngreso() {
+    document.getElementById('modalEditIngreso').classList.remove('open');
+}
+
+async function guardarEdicionIngreso() {
+    const id   = document.getElementById('ei_id').value;
+    const desc = document.getElementById('ei_descripcion').value.trim();
+    const monto = document.getElementById('ei_monto').value;
+    const fecha = document.getElementById('ei_fecha').value;
+    if (!desc || !monto || !fecha) {
+        alert('Completá descripción, monto y fecha.');
+        return;
+    }
+    document.getElementById('loadingEditIngreso').style.display = 'block';
+    document.querySelectorAll('#modalEditIngreso .btn-confirmar, #modalEditIngreso .btn-cancelar')
+        .forEach(b => b.disabled = true);
+    try {
+        const res = await fetch(`/api/ingresos/${id}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({
+                descripcion: desc,
+                monto:       monto,
+                categoria:   document.getElementById('ei_categoria').value,
+                fecha:       fecha,
+                notas:       document.getElementById('ei_notas').value,
+            }),
+        });
+        if (res.ok) {
+            cerrarModalEditIngreso();
+            buscar(paginaActual);
+        } else {
+            const data = await res.json();
+            alert('Error: ' + JSON.stringify(data));
+        }
+    } catch(e) {
+        alert('Error de conexión.');
+    }
+    document.getElementById('loadingEditIngreso').style.display = 'none';
+    document.querySelectorAll('#modalEditIngreso .btn-confirmar, #modalEditIngreso .btn-cancelar')
+        .forEach(b => b.disabled = false);
+}
+
+async function eliminarIngreso(id, descripcion) {
+    if (!confirm(`¿Eliminar el ingreso "${descripcion}"?\nEsta acción no se puede deshacer.`)) return;
+    try {
+        const res = await fetch(`/api/ingresos/${id}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        });
+        if (res.ok) {
+            buscar(paginaActual);
+        } else {
+            alert('No se pudo eliminar el ingreso.');
+        }
+    } catch(e) {
+        alert('Error de conexión.');
+    }
+}
+
+// ══════════════════════════════════════
+// UTILIDADES
+// ══════════════════════════════════════
+function fmtNum(n) {
+    if (n == null) return '—';
+    return Number(n).toLocaleString('es-PY', { maximumFractionDigits: 0 });
+}
+
+function fmtFecha(str) {
+    if (!str) return '—';
+    const [y, m, d] = str.split('-');
+    return `${d}/${m}/${y}`;
+}
+
+function esc(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;');
+}
+
+function escJS(str) {
+    if (!str) return '';
+    return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"');
+}
+
+function getCookie(name) {
+    let val = null;
+    if (document.cookie) {
+        for (let c of document.cookie.split(';')) {
+            c = c.trim();
+            if (c.startsWith(name + '=')) {
+                val = decodeURIComponent(c.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return val;
+}
+</script>
+{% endblock %}

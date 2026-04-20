@@ -83,6 +83,11 @@
             <span class="nav-icon">🧾</span>
             Facturas
         </a>
+        <a href="{% url 'consulta' %}"
+           class="{% if request.resolver_match.url_name == 'consulta' %}active{% endif %}">
+            <span class="nav-icon">🔍</span>
+            Consulta
+        </a>
         <a href="{% url 'reporte' %}"
            class="{% if request.resolver_match.url_name == 'reporte' %}active{% endif %}">
             <span class="nav-icon">📊</span>

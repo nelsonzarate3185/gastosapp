@@ -13,19 +13,26 @@ from facturas.views import (
     FacturaImportCSVView,
     FacturaReporteGastosView,
     FacturaExportExcelView,
-    # Ingresos ✅ NUEVO
+    # Ingresos
     IngresoListCreateView,
     IngresoDetailView,
-    # Dashboard ✅ NUEVO
+    # Dashboard
     DashboardView,
-    # Usuarios ✅ NUEVO
+    # Usuarios
     UsuarioListView,
     # Vistas HTML
     login_view,
     logout_view,
     home_view,
-    ReporteDashboardView,   # ✅ NUEVO
-    reporte_view,           # ✅ NUEVO
+    ReporteDashboardView,
+    reporte_view,
+    consulta_view,
+    # Google Sheets
+    sheets_conectar,
+    sheets_callback,
+    sheets_desconectar,
+    SheetsConfigView,
+    SheetsSincronizarView,
 )
 
 urlpatterns = [
@@ -35,6 +42,7 @@ urlpatterns = [
     # ── Vistas HTML / PWA ────────────────────────────────
     path('', login_view, name='login'),
     path('home/', home_view, name='home'),
+    path('consulta/', consulta_view, name='consulta'),
     path('logout/', logout_view, name='logout'),
 
     # ── API Facturas ─────────────────────────────────────
@@ -56,7 +64,14 @@ urlpatterns = [
     # ── API Usuarios ✅ NUEVO ─────────────────────────────
     path('api/usuarios/', UsuarioListView.as_view(), name='usuario-list'),
 
-      path('reporte/', reporte_view, name='reporte'),                          # ✅ NUEVO
-    path('api/reporte/', ReporteDashboardView.as_view(), name='api-reporte'), # ✅ NUEVO
+    path('reporte/', reporte_view, name='reporte'),
+    path('api/reporte/', ReporteDashboardView.as_view(), name='api-reporte'),
+
+    # ── Google Sheets ─────────────────────────────────────────────
+    path('sheets/conectar/',     sheets_conectar,    name='sheets-conectar'),
+    path('sheets/callback/',     sheets_callback,    name='sheets-callback'),
+    path('sheets/desconectar/',  sheets_desconectar, name='sheets-desconectar'),
+    path('api/sheets/config/',   SheetsConfigView.as_view(),       name='sheets-config'),
+    path('api/sheets/sincronizar/', SheetsSincronizarView.as_view(), name='sheets-sincronizar'),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

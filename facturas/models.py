@@ -125,3 +125,29 @@ class Ingreso(models.Model):
 
     def __str__(self):
         return f"{self.usuario} | {self.descripcion} | {self.monto}"
+
+
+class GoogleSheetConfig(models.Model):
+    """Almacena tokens OAuth2 y configuración de Google Sheets por usuario."""
+
+    usuario = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='sheet_config'
+    )
+    spreadsheet_id = models.CharField(max_length=300, blank=True)
+    access_token = models.TextField(blank=True)
+    refresh_token = models.TextField(blank=True)
+    token_expiry = models.DateTimeField(null=True, blank=True)
+    ultima_sincronizacion = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Configuración Google Sheets'
+        verbose_name_plural = 'Configuraciones Google Sheets'
+
+    def __str__(self):
+        return f"{self.usuario.username} — {self.spreadsheet_id or 'sin hoja'}"
+
+    @property
+    def conectado(self):
+        return bool(self.refresh_token)

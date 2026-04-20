@@ -282,6 +282,127 @@ td.cero     { color:#bbb; }
     </div>
 </div>
 
+<!-- ═══════════════════════════════════════
+     PANEL GOOGLE SHEETS
+═══════════════════════════════════════ -->
+<style>
+.sheets-card {
+    background:white; border-radius:14px; padding:0;
+    box-shadow:0 2px 10px rgba(0,0,0,0.07); margin-bottom:20px;
+    overflow:hidden;
+}
+.sheets-header {
+    display:flex; align-items:center; gap:10px;
+    padding:14px 16px; cursor:pointer;
+    border-bottom:1px solid #f0f0f0;
+    user-select:none;
+}
+.sheets-header:hover { background:#fafafa; }
+.sheets-title { font-size:14px; font-weight:700; color:#333; flex:1; }
+.sheets-badge {
+    font-size:11px; font-weight:700; padding:3px 10px;
+    border-radius:20px; white-space:nowrap;
+}
+.sheets-badge.conectado   { background:#e6f4ea; color:#137333; }
+.sheets-badge.desconectado { background:#fce8e6; color:#c5221f; }
+.sheets-badge.cargando    { background:#f5f5f5; color:#888; }
+.sheets-toggle { font-size:12px; color:#aaa; transition:transform 0.2s; }
+.sheets-toggle.collapsed { transform:rotate(180deg); }
+.sheets-body { padding:16px; }
+.sheets-desc { font-size:13px; color:#666; margin-bottom:14px; line-height:1.5; }
+.sheets-url-row {
+    display:flex; gap:8px; margin-bottom:12px;
+}
+.sheets-url-row input {
+    flex:1; padding:9px 12px; border:1.5px solid #e0e0e0;
+    border-radius:10px; font-size:13px; color:#333; background:white;
+}
+.sheets-url-row input:focus { outline:none; border-color:#1a73e8; }
+.btn-sheets-guardar {
+    padding:9px 16px; background:#1a73e8; color:white;
+    border:none; border-radius:10px; font-size:13px;
+    font-weight:700; cursor:pointer; white-space:nowrap;
+}
+.btn-sheets-conectar {
+    display:inline-flex; align-items:center; gap:8px;
+    padding:10px 18px; background:#1a73e8; color:white;
+    border:none; border-radius:10px; font-size:13px;
+    font-weight:700; cursor:pointer; text-decoration:none;
+}
+.sheets-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.btn-sheets-sync {
+    padding:10px 18px; background:#34a853; color:white;
+    border:none; border-radius:10px; font-size:13px;
+    font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;
+}
+.btn-sheets-sync:disabled { opacity:0.6; cursor:default; }
+.btn-sheets-desconectar {
+    padding:10px 14px; background:#fce8e6; color:#c5221f;
+    border:none; border-radius:10px; font-size:12px;
+    font-weight:600; cursor:pointer; text-decoration:none;
+}
+.sheets-info {
+    font-size:12px; color:#888; margin-top:10px;
+}
+.sheets-result {
+    margin-top:10px; padding:10px 14px; border-radius:10px;
+    font-size:13px; font-weight:600;
+}
+.sheets-result.ok    { background:#e6f4ea; color:#137333; }
+.sheets-result.error { background:#fce8e6; color:#c5221f; }
+.sheets-spin {
+    display:inline-block; width:16px; height:16px;
+    border:2px solid rgba(255,255,255,0.4); border-top-color:white;
+    border-radius:50%; animation:spin 0.8s linear infinite;
+}
+</style>
+
+<div class="sheets-card" id="sheetsCard">
+    <div class="sheets-header" onclick="toggleSheets()">
+        <span class="sheets-title">🔗 Google Sheets</span>
+        <span class="sheets-badge cargando" id="sheetsBadge">Cargando...</span>
+        <span class="sheets-toggle" id="sheetsToggleIcon">▲</span>
+    </div>
+    <div id="sheetsBody" class="sheets-body">
+
+        <!-- Estado: no configurado en servidor -->
+        <div id="sheetsNoConfig" style="display:none;">
+            <p class="sheets-desc">Google Sheets no está configurado en este servidor. Contactá al administrador para activar la integración.</p>
+        </div>
+
+        <!-- Estado: no conectado -->
+        <div id="sheetsNoConectado" style="display:none;">
+            <p class="sheets-desc">Conectá tu cuenta de Google para sincronizar automáticamente tus gastos e ingresos con una hoja de cálculo de Google Drive.</p>
+            <a href="{% url 'sheets-conectar' %}" class="btn-sheets-conectar">
+                🔑 Conectar con Google
+            </a>
+        </div>
+
+        <!-- Estado: conectado -->
+        <div id="sheetsConectado" style="display:none;">
+            <p class="sheets-desc">Pegá la URL de tu hoja de Google Sheets. La app creará una pestaña por año (ej: <em>Gastos 2026</em>, <em>Ingresos 2026</em>).</p>
+            <div class="sheets-url-row">
+                <input type="text" id="sheetsUrl"
+                    placeholder="https://docs.google.com/spreadsheets/d/...">
+                <button class="btn-sheets-guardar" onclick="guardarUrlSheet()">Guardar</button>
+            </div>
+            <div class="sheets-actions">
+                <button class="btn-sheets-sync" id="btnSyncNow" onclick="sincronizarSheets()">
+                    🔄 Sincronizar ahora
+                </button>
+                <a href="{% url 'sheets-desconectar' %}"
+                   class="btn-sheets-desconectar"
+                   onclick="return confirm('¿Desconectar cuenta de Google?')">
+                    Desconectar
+                </a>
+            </div>
+            <p class="sheets-info" id="sheetsUltimaSync"></p>
+            <div id="sheetsResult"></div>
+        </div>
+
+    </div>
+</div>
+
 <script>
 const esSuperuser = {{ request.user.is_superuser|yesno:"true,false" }};
 let gastosPage = 1;
@@ -604,5 +725,146 @@ function exportarExcelGastos() {
     if (uId)   params.set('usuario_id', uId);
     window.location.href = '/api/facturas/exportar-excel/?' + params.toString();
 }
+
+// ═══════════════════════════════════════
+// GOOGLE SHEETS
+// ═══════════════════════════════════════
+let sheetsPanelOpen = true;
+
+function toggleSheets() {
+    sheetsPanelOpen = !sheetsPanelOpen;
+    document.getElementById('sheetsBody').style.display = sheetsPanelOpen ? 'block' : 'none';
+    document.getElementById('sheetsToggleIcon').className =
+        'sheets-toggle' + (sheetsPanelOpen ? '' : ' collapsed');
+}
+
+async function cargarEstadoSheets() {
+    try {
+        const res = await fetch('/api/sheets/config/');
+        if (!res.ok) return;
+        const d = await res.json();
+
+        const badge  = document.getElementById('sheetsBadge');
+        const noConf = document.getElementById('sheetsNoConfig');
+        const noConn = document.getElementById('sheetsNoConectado');
+        const conn   = document.getElementById('sheetsConectado');
+
+        noConf.style.display = 'none';
+        noConn.style.display = 'none';
+        conn.style.display   = 'none';
+
+        if (!d.google_configurado) {
+            badge.textContent  = 'No disponible';
+            badge.className    = 'sheets-badge desconectado';
+            noConf.style.display = 'block';
+            return;
+        }
+
+        if (!d.conectado) {
+            badge.textContent = 'Sin conectar';
+            badge.className   = 'sheets-badge desconectado';
+            noConn.style.display = 'block';
+            return;
+        }
+
+        badge.textContent = 'Conectado ✓';
+        badge.className   = 'sheets-badge conectado';
+        conn.style.display = 'block';
+
+        if (d.spreadsheet_id) {
+            document.getElementById('sheetsUrl').value =
+                'https://docs.google.com/spreadsheets/d/' + d.spreadsheet_id;
+        }
+
+        const syncEl = document.getElementById('sheetsUltimaSync');
+        if (d.ultima_sincronizacion) {
+            const dt = new Date(d.ultima_sincronizacion);
+            syncEl.textContent = '🕐 Última sincronización: ' + dt.toLocaleString('es-PY');
+        } else {
+            syncEl.textContent = 'Nunca sincronizado';
+        }
+    } catch(e) {
+        document.getElementById('sheetsBadge').textContent = 'Error';
+    }
+}
+
+async function guardarUrlSheet() {
+    const url = document.getElementById('sheetsUrl').value.trim();
+    if (!url) { alert('Ingresá la URL de tu hoja de cálculo.'); return; }
+
+    try {
+        const res = await fetch('/api/sheets/config/', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+            },
+            body: JSON.stringify({ spreadsheet_id: url }),
+        });
+        const d = await res.json();
+        if (res.ok) {
+            mostrarResultadoSheets('✅ URL guardada correctamente.', true);
+        } else {
+            mostrarResultadoSheets('❌ ' + (d.error || 'Error al guardar.'), false);
+        }
+    } catch(e) {
+        mostrarResultadoSheets('❌ Error de conexión.', false);
+    }
+}
+
+async function sincronizarSheets() {
+    const btn = document.getElementById('btnSyncNow');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="sheets-spin"></span> Sincronizando...';
+    document.getElementById('sheetsResult').innerHTML = '';
+
+    try {
+        const res = await fetch('/api/sheets/sincronizar/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrfToken() },
+        });
+        const d = await res.json();
+
+        if (res.ok && d.ok) {
+            const hojas = d.hojas.join(', ');
+            mostrarResultadoSheets(
+                `✅ Sincronización completa — ${d.total_facturas} facturas, ${d.total_ingresos} ingresos.<br>` +
+                `📋 Hojas actualizadas: <strong>${hojas}</strong>`,
+                true
+            );
+            const dt = new Date(d.ultima_sincronizacion);
+            document.getElementById('sheetsUltimaSync').textContent =
+                '🕐 Última sincronización: ' + dt.toLocaleString('es-PY');
+        } else {
+            mostrarResultadoSheets('❌ ' + (d.error || 'Error al sincronizar.'), false);
+        }
+    } catch(e) {
+        mostrarResultadoSheets('❌ Error de conexión. Intentá de nuevo.', false);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '🔄 Sincronizar ahora';
+}
+
+function mostrarResultadoSheets(msg, ok) {
+    const el = document.getElementById('sheetsResult');
+    el.className = 'sheets-result ' + (ok ? 'ok' : 'error');
+    el.innerHTML = msg;
+}
+
+function getCsrfToken() {
+    const name = 'csrftoken';
+    for (const c of document.cookie.split(';')) {
+        const t = c.trim();
+        if (t.startsWith(name + '='))
+            return decodeURIComponent(t.substring(name.length + 1));
+    }
+    return '';
+}
+
+// Cargar estado al iniciar
+document.addEventListener('DOMContentLoaded', () => {
+    cargarEstadoSheets();
+});
 </script>
 {% endblock %}

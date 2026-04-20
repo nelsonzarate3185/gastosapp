@@ -211,40 +211,36 @@ class FacturaListView(APIView):
 class FacturaDetailView(APIView):
     """Obtiene o edita una factura específica."""
 
-    def get(self, request, pk):
+    def _get_factura(self, pk, user):
         try:
-            factura = Factura.objects.get(pk=pk, usuario=request.user)
-            return Response(FacturaSerializer(factura).data)
+            if user.is_superuser:
+                return Factura.objects.get(pk=pk)
+            return Factura.objects.get(pk=pk, usuario=user)
         except Factura.DoesNotExist:
-            return Response(
-                {'error': 'Factura no encontrada.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return None
+
+    def get(self, request, pk):
+        factura = self._get_factura(pk, request.user)
+        if not factura:
+            return Response({'error': 'Factura no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(FacturaSerializer(factura).data)
 
     def patch(self, request, pk):
-        try:
-            factura = Factura.objects.get(pk=pk, usuario=request.user)
-            serializer = FacturaSerializer(factura, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Factura.DoesNotExist:
-            return Response(
-                {'error': 'Factura no encontrada.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        factura = self._get_factura(pk, request.user)
+        if not factura:
+            return Response({'error': 'Factura no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = FacturaSerializer(factura, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        try:
-            factura = Factura.objects.get(pk=pk, usuario=request.user)
-            factura.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except Factura.DoesNotExist:
-            return Response(
-                {'error': 'Factura no encontrada.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        factura = self._get_factura(pk, request.user)
+        if not factura:
+            return Response({'error': 'Factura no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        factura.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ══════════════════════════════════════════════════════
@@ -436,13 +432,16 @@ class FacturaReporteGastosView(APIView):
     Lista paginada de facturas con filtros combinables.
 
     Parámetros GET:
-      - desde        YYYY-MM-DD  (fecha_emision >=)
-      - hasta        YYYY-MM-DD  (fecha_emision <=)
-      - ruc          texto parcial
-      - proveedor    texto parcial
-      - usuario_id   int  (solo superuser)
-      - page         int  (default 1)
-      - page_size    int  (default 50, max 200)
+      - desde           YYYY-MM-DD  (fecha_emision >=)
+      - hasta           YYYY-MM-DD  (fecha_emision <=)
+      - ruc             texto parcial
+      - proveedor       texto parcial
+      - timbrado        texto parcial
+      - numero_factura  texto parcial
+      - tipo            electronica | no_electronica
+      - usuario_id      int  (solo superuser)
+      - page            int  (default 1)
+      - page_size       int  (default 50, max 200)
     """
 
     def get(self, request):
@@ -464,6 +463,9 @@ class FacturaReporteGastosView(APIView):
         hasta = request.GET.get('hasta')
         ruc = request.GET.get('ruc', '').strip()
         proveedor = request.GET.get('proveedor', '').strip()
+        timbrado = request.GET.get('timbrado', '').strip()
+        numero_factura = request.GET.get('numero_factura', '').strip()
+        tipo_filtro = request.GET.get('tipo', '').strip()
 
         if desde:
             qs = qs.filter(fecha_emision__gte=desde)
@@ -473,6 +475,12 @@ class FacturaReporteGastosView(APIView):
             qs = qs.filter(ruc__icontains=ruc)
         if proveedor:
             qs = qs.filter(nombre_proveedor__icontains=proveedor)
+        if timbrado:
+            qs = qs.filter(timbrado__icontains=timbrado)
+        if numero_factura:
+            qs = qs.filter(numero_factura__icontains=numero_factura)
+        if tipo_filtro:
+            qs = qs.filter(tipo=tipo_filtro)
 
         total = qs.count()
         total_importe = qs.aggregate(s=Sum('importe_total'))['s'] or 0
@@ -643,13 +651,79 @@ class FacturaExportExcelView(APIView):
 # ══════════════════════════════════════════════════════
 
 class IngresoListCreateView(APIView):
-    """Lista y crea ingresos del usuario logueado."""
+    """
+    Lista y crea ingresos del usuario logueado.
+
+    GET sin ?paginar: devuelve lista completa (IngresoSerializer) — compatible con home.html.
+    GET con ?paginar=1: devuelve formato paginado con filtros.
+
+    Filtros soportados (con ?paginar=1):
+      - desde, hasta   YYYY-MM-DD
+      - categoria      sueldo|freelance|venta|alquiler|transferencia|otro
+      - descripcion    texto parcial
+      - usuario_id     int (solo superuser)
+      - page, page_size
+    """
 
     def get(self, request):
-        ingresos = Ingreso.objects.filter(
-            usuario=request.user
-        ).select_related('usuario')
-        serializer = IngresoSerializer(ingresos, many=True)
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        qs = Ingreso.objects.select_related('usuario').order_by('-fecha', '-creado')
+
+        if request.user.is_superuser:
+            usuario_id = request.GET.get('usuario_id')
+            if usuario_id:
+                qs = qs.filter(usuario_id=usuario_id)
+        else:
+            qs = qs.filter(usuario=request.user)
+
+        desde = request.GET.get('desde', '').strip()
+        hasta = request.GET.get('hasta', '').strip()
+        categoria = request.GET.get('categoria', '').strip()
+        descripcion = request.GET.get('descripcion', '').strip()
+
+        if desde:
+            qs = qs.filter(fecha__gte=desde)
+        if hasta:
+            qs = qs.filter(fecha__lte=hasta)
+        if categoria:
+            qs = qs.filter(categoria=categoria)
+        if descripcion:
+            qs = qs.filter(descripcion__icontains=descripcion)
+
+        if request.GET.get('paginar'):
+            total = qs.count()
+            total_monto = qs.aggregate(s=Sum('monto'))['s'] or 0
+            try:
+                page = max(1, int(request.GET.get('page', 1)))
+                page_size = min(200, max(1, int(request.GET.get('page_size', 50))))
+            except (ValueError, TypeError):
+                page, page_size = 1, 50
+
+            offset = (page - 1) * page_size
+            items = []
+            for i in qs[offset:offset + page_size]:
+                items.append({
+                    'id': i.pk,
+                    'usuario': i.usuario.get_full_name() or i.usuario.username if i.usuario else '—',
+                    'descripcion': i.descripcion,
+                    'monto': float(i.monto),
+                    'categoria': i.categoria,
+                    'categoria_display': i.get_categoria_display(),
+                    'fecha': str(i.fecha),
+                    'notas': i.notas,
+                })
+            return Response({
+                'total': total,
+                'total_monto': float(total_monto),
+                'page': page,
+                'page_size': page_size,
+                'pages': -(-total // page_size),
+                'items': items,
+            })
+
+        serializer = IngresoSerializer(qs, many=True)
         return Response(serializer.data)
 
     def post(self, request):
@@ -667,6 +741,8 @@ class IngresoDetailView(APIView):
 
     def _get_ingreso(self, pk, user):
         try:
+            if user.is_superuser:
+                return Ingreso.objects.get(pk=pk)
             return Ingreso.objects.get(pk=pk, usuario=user)
         except Ingreso.DoesNotExist:
             return None
@@ -833,6 +909,328 @@ def home_view(request):
 def reporte_view(request):
     """Vista HTML para la página de reportería."""
     return render(request, 'pwa/reporte.html')
+
+@login_required(login_url='login')
+def consulta_view(request):
+    """Vista HTML para consulta y gestión de registros."""
+    return render(request, 'pwa/consulta.html')
+
+
+# ══════════════════════════════════════════════════════
+# GOOGLE SHEETS — OAUTH2 + SINCRONIZACIÓN
+# ══════════════════════════════════════════════════════
+
+_SHEETS_SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
+_GOOGLE_CLIENT_CONFIG = lambda: {
+    'web': {
+        'client_id':     settings.GOOGLE_CLIENT_ID,
+        'client_secret': settings.GOOGLE_CLIENT_SECRET,
+        'redirect_uris': [settings.GOOGLE_REDIRECT_URI],
+        'auth_uri':  'https://accounts.google.com/o/oauth2/auth',
+        'token_uri': 'https://oauth2.googleapis.com/token',
+    }
+}
+
+
+def _build_flow():
+    from google_auth_oauthlib.flow import Flow
+    flow = Flow.from_client_config(
+        client_config=_GOOGLE_CLIENT_CONFIG(),
+        scopes=_SHEETS_SCOPES,
+    )
+    flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
+    return flow
+
+
+def _get_gspread_client(config_obj):
+    """Devuelve un cliente gspread autenticado, refrescando token si es necesario."""
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request, AuthorizedSession
+    import gspread
+
+    creds = Credentials(
+        token=config_obj.access_token,
+        refresh_token=config_obj.refresh_token,
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=settings.GOOGLE_CLIENT_ID,
+        client_secret=settings.GOOGLE_CLIENT_SECRET,
+        scopes=_SHEETS_SCOPES,
+    )
+
+    if not creds.valid and creds.refresh_token:
+        creds.refresh(Request())
+        config_obj.access_token = creds.token
+        if creds.expiry:
+            import pytz
+            expiry = creds.expiry
+            if expiry.tzinfo is None:
+                expiry = pytz.utc.localize(expiry)
+            config_obj.token_expiry = expiry
+        config_obj.save(update_fields=['access_token', 'token_expiry'])
+
+    gc = gspread.Client(auth=creds)
+    gc.session = AuthorizedSession(creds)
+    return gc
+
+
+def _extract_spreadsheet_id(url_or_id: str) -> str | None:
+    """Extrae el ID de una URL de Google Sheets o lo devuelve si ya es un ID."""
+    import re
+    if not url_or_id:
+        return None
+    m = re.search(r'/spreadsheets/d/([a-zA-Z0-9\-_]+)', url_or_id)
+    if m:
+        return m.group(1)
+    if re.match(r'^[a-zA-Z0-9\-_]{20,}$', url_or_id):
+        return url_or_id
+    return None
+
+
+def _sincronizar_datos(user, config_obj):
+    """
+    Empuja todos los registros del usuario a su Google Sheet.
+    Crea/actualiza hojas: 'Gastos YYYY' e 'Ingresos YYYY'.
+    Retorna dict con resumen.
+    """
+    import gspread
+
+    gc = _get_gspread_client(config_obj)
+    sh = gc.open_by_key(config_obj.spreadsheet_id)
+
+    # ── Años con datos ────────────────────────────────────────────
+    factura_years = sorted(set(
+        Factura.objects
+        .filter(usuario=user, fecha_emision__isnull=False)
+        .values_list('fecha_emision__year', flat=True)
+        .distinct()
+    ), reverse=True)
+
+    ingreso_years = sorted(set(
+        Ingreso.objects
+        .filter(usuario=user)
+        .values_list('fecha__year', flat=True)
+        .distinct()
+    ), reverse=True)
+
+    hojas_escritas = []
+
+    # ── Gastos por año ────────────────────────────────────────────
+    HEADERS_GASTOS = ['Fecha', 'Timbrado', 'N° Factura', 'RUC', 'Proveedor',
+                      'Tipo', 'Importe (Gs.)', 'IVA (Gs.)', 'Estado', 'Notas']
+
+    for year in factura_years:
+        ws_name = f'Gastos {year}'
+        qs = Factura.objects.filter(
+            usuario=user, fecha_emision__year=year
+        ).order_by('fecha_emision', 'nombre_proveedor')
+
+        try:
+            ws = sh.worksheet(ws_name)
+            ws.clear()
+        except gspread.exceptions.WorksheetNotFound:
+            ws = sh.add_worksheet(title=ws_name, rows=max(qs.count() + 10, 50), cols=10)
+
+        rows = [HEADERS_GASTOS]
+        for f in qs:
+            rows.append([
+                f.fecha_emision.strftime('%d/%m/%Y') if f.fecha_emision else '',
+                f.timbrado or '',
+                f.numero_factura or '',
+                f.ruc.split('-')[0].strip() if f.ruc else '',
+                f.nombre_proveedor or '',
+                f.get_tipo_display(),
+                float(f.importe_total) if f.importe_total is not None else '',
+                float(f.importe_impuesto) if f.importe_impuesto is not None else '',
+                f.get_estado_display(),
+                f.notas or '',
+            ])
+        ws.update(rows, 'A1')
+        hojas_escritas.append(ws_name)
+
+    # ── Ingresos por año ──────────────────────────────────────────
+    HEADERS_INGRESOS = ['Fecha', 'Descripción', 'Categoría', 'Monto (Gs.)', 'Notas']
+
+    for year in ingreso_years:
+        ws_name = f'Ingresos {year}'
+        qs = Ingreso.objects.filter(
+            usuario=user, fecha__year=year
+        ).order_by('fecha', 'descripcion')
+
+        try:
+            ws = sh.worksheet(ws_name)
+            ws.clear()
+        except gspread.exceptions.WorksheetNotFound:
+            ws = sh.add_worksheet(title=ws_name, rows=max(qs.count() + 10, 50), cols=5)
+
+        rows = [HEADERS_INGRESOS]
+        for i in qs:
+            rows.append([
+                i.fecha.strftime('%d/%m/%Y') if i.fecha else '',
+                i.descripcion,
+                i.get_categoria_display(),
+                float(i.monto),
+                i.notas or '',
+            ])
+        ws.update(rows, 'A1')
+        hojas_escritas.append(ws_name)
+
+    config_obj.ultima_sincronizacion = timezone.now()
+    config_obj.save(update_fields=['ultima_sincronizacion'])
+
+    return {
+        'hojas': hojas_escritas,
+        'total_facturas': Factura.objects.filter(usuario=user).count(),
+        'total_ingresos': Ingreso.objects.filter(usuario=user).count(),
+    }
+
+
+# ── Vistas OAuth ──────────────────────────────────────────────────────────────
+
+@login_required(login_url='login')
+def sheets_conectar(request):
+    """Inicia el flujo OAuth2 con Google."""
+    if not settings.GOOGLE_CLIENT_ID:
+        messages.error(request, 'Google Sheets no está configurado en este servidor.')
+        return redirect('reporte')
+
+    flow = _build_flow()
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='consent',
+    )
+    request.session['google_oauth_state'] = state
+    return redirect(authorization_url)
+
+
+@login_required(login_url='login')
+def sheets_callback(request):
+    """Maneja el callback de Google OAuth2 y almacena los tokens."""
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    error = request.GET.get('error')
+    if error:
+        messages.error(request, f'Acceso denegado por Google: {error}')
+        return redirect('reporte')
+
+    try:
+        flow = _build_flow()
+        flow.fetch_token(authorization_response=request.build_absolute_uri())
+        creds = flow.credentials
+
+        import pytz
+        expiry = creds.expiry
+        if expiry and expiry.tzinfo is None:
+            expiry = pytz.utc.localize(expiry)
+
+        from .models import GoogleSheetConfig
+        cfg, _ = GoogleSheetConfig.objects.get_or_create(usuario=request.user)
+        cfg.access_token  = creds.token or ''
+        cfg.refresh_token = creds.refresh_token or cfg.refresh_token
+        cfg.token_expiry  = expiry
+        cfg.save()
+
+        messages.success(request, '✅ Cuenta de Google conectada correctamente.')
+    except Exception as e:
+        messages.error(request, f'Error al conectar con Google: {e}')
+
+    return redirect('reporte')
+
+
+@login_required(login_url='login')
+def sheets_desconectar(request):
+    """Elimina los tokens del usuario."""
+    from .models import GoogleSheetConfig
+    GoogleSheetConfig.objects.filter(usuario=request.user).update(
+        access_token='', refresh_token='', token_expiry=None
+    )
+    messages.success(request, 'Cuenta de Google desconectada.')
+    return redirect('reporte')
+
+
+# ── APIs ──────────────────────────────────────────────────────────────────────
+
+class SheetsConfigView(APIView):
+    """GET: estado de conexión. PATCH: actualiza spreadsheet_id."""
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        from .models import GoogleSheetConfig
+        cfg = GoogleSheetConfig.objects.filter(usuario=request.user).first()
+
+        if not cfg:
+            return Response({
+                'conectado': False,
+                'spreadsheet_id': '',
+                'ultima_sincronizacion': None,
+                'google_configurado': bool(settings.GOOGLE_CLIENT_ID),
+            })
+
+        return Response({
+            'conectado': cfg.conectado,
+            'spreadsheet_id': cfg.spreadsheet_id,
+            'ultima_sincronizacion': cfg.ultima_sincronizacion.isoformat() if cfg.ultima_sincronizacion else None,
+            'google_configurado': bool(settings.GOOGLE_CLIENT_ID),
+        })
+
+    def patch(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        url_o_id = (request.data.get('spreadsheet_id') or '').strip()
+        sheet_id = _extract_spreadsheet_id(url_o_id)
+        if not sheet_id:
+            return Response(
+                {'error': 'URL o ID de hoja inválido.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from .models import GoogleSheetConfig
+        cfg, _ = GoogleSheetConfig.objects.get_or_create(usuario=request.user)
+        cfg.spreadsheet_id = sheet_id
+        cfg.save(update_fields=['spreadsheet_id'])
+        return Response({'spreadsheet_id': sheet_id})
+
+
+class SheetsSincronizarView(APIView):
+    """Ejecuta la sincronización completa con Google Sheets."""
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        from .models import GoogleSheetConfig
+        cfg = GoogleSheetConfig.objects.filter(usuario=request.user).first()
+
+        if not cfg or not cfg.conectado:
+            return Response(
+                {'error': 'Primero conectá tu cuenta de Google.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not cfg.spreadsheet_id:
+            return Response(
+                {'error': 'Ingresá la URL o ID de tu hoja de cálculo.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            resultado = _sincronizar_datos(request.user, cfg)
+            return Response({
+                'ok': True,
+                'hojas': resultado['hojas'],
+                'total_facturas': resultado['total_facturas'],
+                'total_ingresos': resultado['total_ingresos'],
+                'ultima_sincronizacion': cfg.ultima_sincronizacion.isoformat(),
+            })
+        except Exception as e:
+            return Response(
+                {'error': f'Error al sincronizar: {e}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class ReporteDashboardView(APIView):
     """
