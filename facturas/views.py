@@ -967,10 +967,10 @@ def _get_gspread_client(config_obj):
         creds.refresh(Request())
         config_obj.access_token = creds.token
         if creds.expiry:
-            import pytz
+            from datetime import timezone as _tz
             expiry = creds.expiry
             if expiry.tzinfo is None:
-                expiry = pytz.utc.localize(expiry)
+                expiry = expiry.replace(tzinfo=_tz.utc)
             config_obj.token_expiry = expiry
         config_obj.save(update_fields=['access_token', 'token_expiry'])
 
@@ -1149,10 +1149,10 @@ def sheets_callback(request):
         flow.fetch_token(authorization_response=request.build_absolute_uri())
         creds = flow.credentials
 
-        import pytz
+        from datetime import timezone as _tz
         expiry = creds.expiry
         if expiry and expiry.tzinfo is None:
-            expiry = pytz.utc.localize(expiry)
+            expiry = expiry.replace(tzinfo=_tz.utc)
 
         from .models import GoogleSheetConfig
         cfg, _ = GoogleSheetConfig.objects.get_or_create(usuario=request.user)
