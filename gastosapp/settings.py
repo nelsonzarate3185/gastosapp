@@ -118,9 +118,12 @@ TESSERACT_CMD = config(
 OCR_API_KEY = config('OCR_API_KEY', default='helloworld')
 
 # ── Google OAuth2 (para sincronización con Google Sheets) ─────────────────────
-GOOGLE_CLIENT_ID     = config('GOOGLE_CLIENT_ID', default='')
-GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
-GOOGLE_REDIRECT_URI  = config(
+GOOGLE_CLIENT_ID      = config('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CLIENT_SECRET  = config('GOOGLE_CLIENT_SECRET', default='')
+GOOGLE_REDIRECT_URI   = config(
     'GOOGLE_REDIRECT_URI',
     default='http://localhost:8000/sheets/callback/'
 )
+# 'installed' = credencial tipo Desktop (localhost sin registro de URI)
+# 'web'       = credencial tipo Aplicación Web (requiere URI registrada en Cloud Console)
+GOOGLE_CREDENTIAL_TYPE = config('GOOGLE_CREDENTIAL_TYPE', default='installed')

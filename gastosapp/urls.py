@@ -28,6 +28,7 @@ from facturas.views import (
     reporte_view,
     consulta_view,
     # Google Sheets
+    sheets_debug,
     sheets_conectar,
     sheets_callback,
     sheets_desconectar,
@@ -68,6 +69,7 @@ urlpatterns = [
     path('api/reporte/', ReporteDashboardView.as_view(), name='api-reporte'),
 
     # ── Google Sheets ─────────────────────────────────────────────
+    path('sheets/debug/',        sheets_debug,       name='sheets-debug'),
     path('sheets/conectar/',     sheets_conectar,    name='sheets-conectar'),
     path('sheets/callback/',     sheets_callback,    name='sheets-callback'),
     path('sheets/desconectar/',  sheets_desconectar, name='sheets-desconectar'),

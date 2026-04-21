@@ -922,15 +922,20 @@ def consulta_view(request):
 
 _SHEETS_SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-_GOOGLE_CLIENT_CONFIG = lambda: {
-    'web': {
-        'client_id':     settings.GOOGLE_CLIENT_ID,
-        'client_secret': settings.GOOGLE_CLIENT_SECRET,
-        'redirect_uris': [settings.GOOGLE_REDIRECT_URI],
-        'auth_uri':  'https://accounts.google.com/o/oauth2/auth',
-        'token_uri': 'https://oauth2.googleapis.com/token',
+def _GOOGLE_CLIENT_CONFIG():
+    # 'installed' = credencial tipo Desktop/Escritorio en Google Cloud Console.
+    # Para localhost no requiere registrar redirect URIs (Google lo permite automáticamente).
+    # Para producción (Render) sí hay que registrar la URI.
+    cred_type = getattr(settings, 'GOOGLE_CREDENTIAL_TYPE', 'installed')
+    return {
+        cred_type: {
+            'client_id':     settings.GOOGLE_CLIENT_ID,
+            'client_secret': settings.GOOGLE_CLIENT_SECRET,
+            'redirect_uris': [settings.GOOGLE_REDIRECT_URI],
+            'auth_uri':  'https://accounts.google.com/o/oauth2/auth',
+            'token_uri': 'https://oauth2.googleapis.com/token',
+        }
     }
-}
 
 
 def _build_flow():
@@ -1088,16 +1093,40 @@ def _sincronizar_datos(user, config_obj):
 # ── Vistas OAuth ──────────────────────────────────────────────────────────────
 
 @login_required(login_url='login')
+def sheets_debug(request):
+    """Solo en DEBUG: muestra la URL OAuth que se generaría."""
+    if not settings.DEBUG:
+        from django.http import Http404
+        raise Http404
+    import urllib.parse as up
+    flow = _build_flow()
+    url, _ = flow.authorization_url(access_type='offline', prompt='consent')
+    params = dict(up.parse_qsl(up.urlparse(url).query))
+    from django.http import JsonResponse
+    return JsonResponse({
+        'redirect_uri_que_envia_la_app': params.get('redirect_uri'),
+        'client_id': params.get('client_id'),
+        'GOOGLE_REDIRECT_URI_en_settings': settings.GOOGLE_REDIRECT_URI,
+        'url_completa': url,
+        'instruccion': 'Registrá exactamente "redirect_uri_que_envia_la_app" en Google Cloud Console',
+    }, json_dumps_params={'ensure_ascii': False, 'indent': 2})
+
+
+@login_required(login_url='login')
 def sheets_conectar(request):
     """Inicia el flujo OAuth2 con Google."""
     if not settings.GOOGLE_CLIENT_ID:
         messages.error(request, 'Google Sheets no está configurado en este servidor.')
         return redirect('reporte')
 
+    # Necesario para permitir redirect HTTP en desarrollo local
+    if settings.DEBUG:
+        import os
+        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
     flow = _build_flow()
     authorization_url, state = flow.authorization_url(
         access_type='offline',
-        include_granted_scopes='true',
         prompt='consent',
     )
     request.session['google_oauth_state'] = state
