@@ -1,6 +1,7 @@
 # gastos/models.py
 
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import User
 
 
@@ -81,6 +82,13 @@ class Factura(models.Model):
         verbose_name = 'Factura'
         verbose_name_plural = 'Facturas'
         ordering = ['-creado']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['usuario', 'ruc', 'timbrado', 'numero_factura'],
+                condition=~Q(ruc='') & ~Q(timbrado='') & ~Q(numero_factura=''),
+                name='unique_factura_por_usuario_ruc_timbrado_numero',
+            )
+        ]
 
     def __str__(self):
         return f"{self.usuario} | {self.nombre_proveedor} | {self.importe_total}"

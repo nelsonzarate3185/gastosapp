@@ -395,6 +395,19 @@ class FacturaImportCSVView(APIView):
                 errores.append({'fila': num_fila, 'error': f'total_iva inválido: "{total_iva_str}".'})
                 continue
 
+            if ruc and timbrado and numero_factura:
+                if Factura.objects.filter(
+                    usuario=request.user,
+                    ruc=ruc,
+                    timbrado=timbrado,
+                    numero_factura=numero_factura,
+                ).exists():
+                    errores.append({
+                        'fila': num_fila,
+                        'error': f'Duplicado: ya existe una factura con RUC {ruc}, timbrado {timbrado} y número {numero_factura}.',
+                    })
+                    continue
+
             factura = Factura(
                 usuario=request.user,
                 tipo=tipo,

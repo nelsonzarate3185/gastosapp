@@ -41,6 +41,27 @@ class FacturaSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['creado', 'actualizado']
 
+    def validate(self, data):
+        ruc = data.get('ruc', '') or ''
+        timbrado = data.get('timbrado', '') or ''
+        numero_factura = data.get('numero_factura', '') or ''
+        usuario = data.get('usuario')
+
+        if ruc and timbrado and numero_factura and usuario:
+            qs = Factura.objects.filter(
+                usuario=usuario,
+                ruc=ruc,
+                timbrado=timbrado,
+                numero_factura=numero_factura,
+            )
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    f'Ya existe una factura con RUC {ruc}, timbrado {timbrado} y número {numero_factura}.'
+                )
+        return data
+
 
 # ── Ingreso ──────────────────────────────────────────────────────────────────
 class IngresoSerializer(serializers.ModelSerializer):
