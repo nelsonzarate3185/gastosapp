@@ -167,10 +167,19 @@ def ocr_con_tesseract(imagen):
     """OCR local con pytesseract como fallback."""
     import pytesseract
     from PIL import Image as PILImage
+    import shutil
+    import os
 
-    pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
+    cmd = settings.TESSERACT_CMD
+    if not os.path.exists(cmd):
+        cmd = shutil.which('tesseract') or cmd
+    pytesseract.pytesseract.tesseract_cmd = cmd
+
     img = PILImage.open(imagen)
-    return pytesseract.image_to_string(img, lang='spa')
+    try:
+        return pytesseract.image_to_string(img, lang='spa')
+    except pytesseract.TesseractError:
+        return pytesseract.image_to_string(img)
 
 
 class FacturaUploadView(APIView):
