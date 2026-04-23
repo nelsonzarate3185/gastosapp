@@ -163,6 +163,16 @@ def extraer_datos_ocr(texto):
 # FACTURAS - ENDPOINTS API
 # ══════════════════════════════════════════════════════
 
+def ocr_con_tesseract(imagen):
+    """OCR local con pytesseract como fallback."""
+    import pytesseract
+    from PIL import Image as PILImage
+
+    pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
+    img = PILImage.open(imagen)
+    return pytesseract.image_to_string(img, lang='spa')
+
+
 class FacturaUploadView(APIView):
     """Procesa imagen con OCR y devuelve datos extraídos (sin guardar)."""
     parser_classes = [MultiPartParser, FormParser]
@@ -174,18 +184,28 @@ class FacturaUploadView(APIView):
                 {'error': 'No se recibió ninguna imagen.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        texto = ''
+        fuente = 'api'
         try:
             texto = ocr_con_api(imagen)
-            datos = extraer_datos_ocr(texto)
-            return Response(
-                {'texto_ocr': texto, 'datos_extraidos': datos},
-                status=status.HTTP_200_OK
-            )
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        except Exception:
+            # OCR.space falló — intentar con Tesseract local
+            imagen.seek(0)
+            try:
+                texto = ocr_con_tesseract(imagen)
+                fuente = 'tesseract'
+            except Exception as e2:
+                return Response(
+                    {'error': f'OCR no disponible: {e2}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+        datos = extraer_datos_ocr(texto)
+        return Response(
+            {'texto_ocr': texto, 'datos_extraidos': datos, 'fuente_ocr': fuente},
+            status=status.HTTP_200_OK
+        )
 
 
 class FacturaConfirmarView(APIView):
