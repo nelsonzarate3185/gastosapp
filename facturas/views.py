@@ -36,17 +36,30 @@ from openpyxl.utils import get_column_letter
 
 def ocr_con_api(imagen):
     api_key = settings.OCR_API_KEY
-    response = requests.post(
-        'https://api.ocr.space/parse/image',
-        files={'image': imagen},
-        data={
-            'apikey': api_key,
-            'language': 'spa',
-            'isOverlayRequired': False,
-        },
-        timeout=30
-    )
-    result = response.json()
+    try:
+        response = requests.post(
+            'https://api.ocr.space/parse/image',
+            files={'image': imagen},
+            data={
+                'apikey': api_key,
+                'language': 'spa',
+                'isOverlayRequired': False,
+            },
+            timeout=30,
+        )
+    except requests.exceptions.Timeout:
+        raise Exception('El servicio OCR tardó demasiado. Intentá de nuevo.')
+    except requests.exceptions.ConnectionError:
+        raise Exception('No se pudo conectar al servicio OCR. Verificá la conexión.')
+
+    try:
+        result = response.json()
+    except ValueError:
+        raise Exception(
+            f'El servicio OCR devolvió una respuesta inválida (HTTP {response.status_code}). '
+            'Es posible que se haya superado el límite de uso del API key gratuito.'
+        )
+
     if result.get('IsErroredOnProcessing'):
         raise Exception(result.get('ErrorMessage', 'Error en OCR'))
     parsed = result.get('ParsedResults', [])

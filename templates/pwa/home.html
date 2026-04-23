@@ -740,27 +740,28 @@ async function cargarDashboard() {
         const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                        'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-        document.getElementById('periodoMes').textContent =
-            `${meses[d.periodo.mes - 1]} ${d.periodo.anio}`;
-        document.getElementById('anioLabel').textContent = `Año ${d.periodo.anio}`;
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+        set('periodoMes', `${meses[d.periodo.mes - 1]} ${d.periodo.anio}`);
+        set('anioLabel',  `Año ${d.periodo.anio}`);
 
         // Mensual
         const balM = d.mensual.balance;
-        document.getElementById('balanceMes').textContent = 'Gs. ' + fmt(balM);
-        document.getElementById('balanceMes').style.color =
-            balM >= 0 ? '#a5d6a7' : '#ef9a9a';
-
-        document.getElementById('ingresosMes').textContent = 'Gs. ' + fmt(d.mensual.ingresos);
-        document.getElementById('egresosMes').textContent  = 'Gs. ' + fmt(d.mensual.egresos);
+        set('balanceMes',  'Gs. ' + fmt(balM));
+        const elBalM = document.getElementById('balanceMes');
+        if (elBalM) elBalM.style.color = balM >= 0 ? '#a5d6a7' : '#ef9a9a';
+        set('ingresosMes', 'Gs. ' + fmt(d.mensual.ingresos));
+        set('egresosMes',  'Gs. ' + fmt(d.mensual.egresos));
 
         // Anual
         const balA = d.anual.balance;
         const elBalA = document.getElementById('balanceAnio');
-        elBalA.textContent = 'Gs. ' + fmt(balA);
-        elBalA.className = 'amount ' + (balA >= 0 ? 'positivo' : 'negativo');
-
-        document.getElementById('ingresosAnio').textContent = 'Gs. ' + fmt(d.anual.ingresos);
-        document.getElementById('egresosAnio').textContent  = 'Gs. ' + fmt(d.anual.egresos);
+        if (elBalA) {
+            elBalA.textContent = 'Gs. ' + fmt(balA);
+            elBalA.className = 'amount ' + (balA >= 0 ? 'positivo' : 'negativo');
+        }
+        set('ingresosAnio', 'Gs. ' + fmt(d.anual.ingresos));
+        set('egresosAnio',  'Gs. ' + fmt(d.anual.egresos));
 
     } catch(e) {
         console.error('Error cargando dashboard:', e);
