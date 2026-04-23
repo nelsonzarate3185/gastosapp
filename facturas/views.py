@@ -660,6 +660,100 @@ class FacturaExportExcelView(APIView):
 
 
 # ══════════════════════════════════════════════════════
+# EXPORTACIÓN CSV DE GASTOS
+# ══════════════════════════════════════════════════════
+
+class FacturaExportCSVView(APIView):
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        qs = Factura.objects.select_related('usuario').order_by('fecha_emision', 'nombre_proveedor')
+
+        if request.user.is_superuser:
+            usuario_id = request.GET.get('usuario_id')
+            if usuario_id:
+                qs = qs.filter(usuario_id=usuario_id)
+        else:
+            qs = qs.filter(usuario=request.user)
+
+        desde = request.GET.get('desde')
+        hasta = request.GET.get('hasta')
+        if desde:
+            qs = qs.filter(fecha_emision__gte=desde)
+        if hasta:
+            qs = qs.filter(fecha_emision__lte=hasta)
+
+        from datetime import date
+        sufijo = f"_{desde or ''}_{hasta or ''}" if (desde or hasta) else ''
+        filename = f"gastos{sufijo}_{date.today().strftime('%Y%m%d')}.csv"
+
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(['RUC', 'Proveedor', 'Fecha', 'Timbrado', 'N° Factura', 'Monto', 'Impuesto', 'Tipo'])
+        for f in qs:
+            writer.writerow([
+                _ruc_sin_dv(f.ruc),
+                f.nombre_proveedor,
+                f.fecha_emision.strftime('%d/%m/%Y') if f.fecha_emision else '',
+                f.timbrado,
+                f.numero_factura,
+                float(f.importe_total) if f.importe_total is not None else '',
+                float(f.importe_impuesto) if f.importe_impuesto is not None else '',
+                f.get_tipo_display(),
+            ])
+        return response
+
+
+# ══════════════════════════════════════════════════════
+# EXPORTACIÓN CSV DE INGRESOS
+# ══════════════════════════════════════════════════════
+
+class IngresoExportCSVView(APIView):
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        qs = Ingreso.objects.select_related('usuario').order_by('fecha', 'descripcion')
+
+        if request.user.is_superuser:
+            usuario_id = request.GET.get('usuario_id')
+            if usuario_id:
+                qs = qs.filter(usuario_id=usuario_id)
+        else:
+            qs = qs.filter(usuario=request.user)
+
+        desde = request.GET.get('desde')
+        hasta = request.GET.get('hasta')
+        if desde:
+            qs = qs.filter(fecha__gte=desde)
+        if hasta:
+            qs = qs.filter(fecha__lte=hasta)
+
+        from datetime import date
+        sufijo = f"_{desde or ''}_{hasta or ''}" if (desde or hasta) else ''
+        filename = f"ingresos{sufijo}_{date.today().strftime('%Y%m%d')}.csv"
+
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(['Descripción', 'Monto', 'Categoría', 'Fecha', 'Notas', 'Usuario'])
+        for i in qs:
+            writer.writerow([
+                i.descripcion,
+                float(i.monto),
+                i.get_categoria_display(),
+                i.fecha.strftime('%d/%m/%Y') if i.fecha else '',
+                i.notas,
+                i.usuario.get_full_name() or i.usuario.username if i.usuario else '',
+            ])
+        return response
+
+
+# ══════════════════════════════════════════════════════
 # INGRESOS - ENDPOINTS API  ✅ NUEVO
 # ══════════════════════════════════════════════════════
 

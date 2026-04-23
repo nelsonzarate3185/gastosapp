@@ -63,6 +63,11 @@
     border:1.5px solid #a8d5b5; border-radius:10px; font-size:13px;
     font-weight:700; cursor:pointer; white-space:nowrap;
 }
+.btn-csv {
+    padding:10px 14px; background:#fff8e1; color:#795548;
+    border:1.5px solid #ffe082; border-radius:10px; font-size:13px;
+    font-weight:700; cursor:pointer; white-space:nowrap;
+}
 
 /* ═══════════════════════════════════════
    CARDS RESUMEN FINANCIERO
@@ -205,6 +210,7 @@ td.cero     { color:#bbb; }
 <div class="page-tabs">
     <button class="page-tab-btn active" onclick="mostrarTab('financiero', this)">📈 Financiero</button>
     <button class="page-tab-btn" onclick="mostrarTab('gastos', this)">🧾 Gastos</button>
+    <button class="page-tab-btn" onclick="mostrarTab('ingresos', this)">💰 Ingresos</button>
 </div>
 
 <!-- ═══════════════════════════════════════
@@ -269,6 +275,7 @@ td.cero     { color:#bbb; }
             <button class="btn-filtrar" onclick="cargarGastos(1)">🔍 Filtrar</button>
             <button class="btn-limpiar" onclick="limpiarFiltrosGastos()">✕ Limpiar</button>
             <button class="btn-excel" onclick="exportarExcelGastos()">📥 Excel</button>
+            <button class="btn-csv" onclick="exportarCSVGastos()">📄 CSV</button>
         </div>
     </div>
 
@@ -279,6 +286,39 @@ td.cero     { color:#bbb; }
 
     <div id="contenidoGastos">
         <div class="loading-overlay"><span class="spinner"></span> Cargando...</div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     TAB 3 — INGRESOS
+═══════════════════════════════════════ -->
+<div id="tabIngresos" style="display:none;">
+    <div class="filtros-card">
+        <h2>🔍 Filtros</h2>
+        <div class="filtros-grid">
+            <div class="filtro-group">
+                <label>Desde</label>
+                <input type="date" id="iDesde">
+            </div>
+            <div class="filtro-group">
+                <label>Hasta</label>
+                <input type="date" id="iHasta">
+            </div>
+        </div>
+        {% if request.user.is_superuser %}
+        <div class="filtros-grid full" style="margin-bottom:10px;">
+            <div class="filtro-group">
+                <label>Usuario</label>
+                <select id="iUsuario">
+                    <option value="">— Todos los usuarios —</option>
+                </select>
+            </div>
+        </div>
+        {% endif %}
+        <div class="filtros-acciones">
+            <button class="btn-limpiar" onclick="limpiarFiltrosIngresos()">✕ Limpiar</button>
+            <button class="btn-csv" onclick="exportarCSVIngresos()">📄 CSV Ingresos</button>
+        </div>
     </div>
 </div>
 
@@ -437,6 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function mostrarTab(tab, btn) {
     document.getElementById('tabFinanciero').style.display = tab === 'financiero' ? 'block' : 'none';
     document.getElementById('tabGastos').style.display     = tab === 'gastos'     ? 'block' : 'none';
+    document.getElementById('tabIngresos').style.display   = tab === 'ingresos'   ? 'block' : 'none';
     document.querySelectorAll('.page-tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     if (tab === 'gastos') cargarGastos(gastosPage);
@@ -449,7 +490,7 @@ async function cargarUsuariosSelects() {
     try {
         const res = await fetch('/api/usuarios/');
         const usuarios = await res.json();
-        const ids = ['filtroUsuarioFin', 'gUsuario'];
+        const ids = ['filtroUsuarioFin', 'gUsuario', 'iUsuario'];
         ids.forEach(id => {
             const sel = document.getElementById(id);
             if (!sel) return;
@@ -724,6 +765,40 @@ function exportarExcelGastos() {
     if (hasta) params.set('hasta', hasta);
     if (uId)   params.set('usuario_id', uId);
     window.location.href = '/api/facturas/exportar-excel/?' + params.toString();
+}
+
+// ═══════════════════════════════════════
+// EXPORTAR CSV DESDE REPORTE GASTOS
+// ═══════════════════════════════════════
+function exportarCSVGastos() {
+    const params = new URLSearchParams();
+    const desde = document.getElementById('gDesde').value;
+    const hasta = document.getElementById('gHasta').value;
+    const uId   = esSuperuser ? document.getElementById('gUsuario').value : '';
+    if (desde) params.set('desde', desde);
+    if (hasta) params.set('hasta', hasta);
+    if (uId)   params.set('usuario_id', uId);
+    window.location.href = '/api/facturas/exportar-csv/?' + params.toString();
+}
+
+// ═══════════════════════════════════════
+// EXPORTAR CSV INGRESOS
+// ═══════════════════════════════════════
+function exportarCSVIngresos() {
+    const params = new URLSearchParams();
+    const desde = document.getElementById('iDesde').value;
+    const hasta = document.getElementById('iHasta').value;
+    const uId   = esSuperuser ? document.getElementById('iUsuario').value : '';
+    if (desde) params.set('desde', desde);
+    if (hasta) params.set('hasta', hasta);
+    if (uId)   params.set('usuario_id', uId);
+    window.location.href = '/api/ingresos/exportar-csv/?' + params.toString();
+}
+
+function limpiarFiltrosIngresos() {
+    document.getElementById('iDesde').value = '';
+    document.getElementById('iHasta').value = '';
+    if (esSuperuser) document.getElementById('iUsuario').value = '';
 }
 
 // ═══════════════════════════════════════
