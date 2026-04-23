@@ -196,25 +196,24 @@ class FacturaUploadView(APIView):
 
         texto = ''
         fuente = 'api'
+        aviso = ''
+
         try:
             texto = ocr_con_api(imagen)
         except Exception:
-            # OCR.space falló — intentar con Tesseract local
             imagen.seek(0)
             try:
                 texto = ocr_con_tesseract(imagen)
                 fuente = 'tesseract'
-            except Exception as e2:
-                return Response(
-                    {'error': f'OCR no disponible: {e2}'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+            except Exception:
+                fuente = 'ninguno'
+                aviso = 'OCR no disponible. Podés completar los datos manualmente.'
 
         datos = extraer_datos_ocr(texto)
-        return Response(
-            {'texto_ocr': texto, 'datos_extraidos': datos, 'fuente_ocr': fuente},
-            status=status.HTTP_200_OK
-        )
+        resp = {'texto_ocr': texto, 'datos_extraidos': datos, 'fuente_ocr': fuente}
+        if aviso:
+            resp['aviso'] = aviso
+        return Response(resp, status=status.HTTP_200_OK)
 
 
 class FacturaConfirmarView(APIView):
@@ -1019,10 +1018,15 @@ class DashboardView(APIView):
 # ══════════════════════════════════════════════════════
 
 class UsuarioListView(APIView):
-    """Lista usuarios disponibles para asignar a una factura."""
+    """Lista usuarios disponibles. Solo devuelve todos si el usuario tiene permiso ver_todo."""
 
     def get(self, request):
-        usuarios = User.objects.filter(is_active=True).order_by('username')
+        if not request.user.is_authenticated:
+            return Response([], status=status.HTTP_200_OK)
+        if _puede_ver_todo(request.user):
+            usuarios = User.objects.filter(is_active=True).order_by('username')
+        else:
+            usuarios = User.objects.filter(pk=request.user.pk)
         serializer = UsuarioSerializer(usuarios, many=True)
         return Response(serializer.data)
 

@@ -336,11 +336,13 @@
         <h2>✏️ Revisá los datos extraídos</h2>
         <p class="subtitle">Los campos con <span class="ocr-tag">OCR</span> fueron detectados automáticamente.</p>
 
-        <!-- Selector de usuario -->
+        <!-- Selector de usuario (solo usuarios con permiso ver_todo) -->
+        {% if request.user.is_superuser or perms.facturas.ver_todo %}
         <div class="form-group">
             <label>👤 Asignar a usuario</label>
             <select id="f_usuario"></select>
         </div>
+        {% endif %}
 
         <div class="form-row">
             <div class="form-group">
@@ -783,6 +785,7 @@ async function cargarUsuarios() {
         if (!res.ok) return;
         usuariosCache = await res.json();
         const sel = document.getElementById('f_usuario');
+        if (!sel) return;
         sel.innerHTML = '';
         usuariosCache.forEach(u => {
             const opt = document.createElement('option');
@@ -863,12 +866,18 @@ async function procesarFactura() {
         });
         const data = await res.json();
         if (res.ok) {
-            esCargaManual = false;
+            esCargaManual = data.fuente_ocr === 'ninguno';
             llenarFormularioOCR(data.datos_extraidos);
             textoOcrGuardado = data.texto_ocr || '';
             document.getElementById('loading').style.display = 'none';
             document.getElementById('cardUpload').style.display = 'none';
             document.getElementById('ocrPreview').style.display = 'block';
+            if (data.aviso) {
+                const h2 = document.querySelector('#ocrPreview h2');
+                const sub = document.querySelector('#ocrPreview p.subtitle');
+                if (h2) h2.textContent = '✏️ Completá los datos manualmente';
+                if (sub) sub.textContent = data.aviso;
+            }
         } else {
             alert('Error: ' + (data.error || 'No se pudo procesar.'));
             document.getElementById('loading').style.display = 'none';
@@ -964,7 +973,8 @@ async function confirmarFactura() {
     const fd = new FormData();
     if (imagenFile && !esCargaManual) fd.append('imagen', imagenFile);
     fd.append('tipo',             document.getElementById('f_tipo_form').value || tipoSeleccionado);
-    fd.append('usuario',          document.getElementById('f_usuario').value);
+    const selUsuario = document.getElementById('f_usuario');
+    if (selUsuario && selUsuario.value) fd.append('usuario', selUsuario.value);
     fd.append('nombre_proveedor', document.getElementById('f_proveedor').value);
     fd.append('ruc',              document.getElementById('f_ruc').value);
     fd.append('timbrado',         document.getElementById('f_timbrado').value);
