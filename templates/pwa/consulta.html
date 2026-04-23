@@ -274,7 +274,7 @@ td.text-right { text-align: right; }
                     <option value="no_electronica">No Electrónica</option>
                 </select>
             </div>
-            <div class="filtro-group" id="fGrupoUsuario" style="display:{% if request.user.is_superuser %}block{% else %}none{% endif %};">
+            <div class="filtro-group" id="fGrupoUsuario" style="display:{% if request.user.is_superuser or perms.facturas.ver_todo %}block{% else %}none{% endif %};">
                 <label>Usuario</label>
                 <select id="fUsuario">
                     <option value="">— Todos los usuarios —</option>
@@ -303,7 +303,7 @@ td.text-right { text-align: right; }
                 </select>
             </div>
         </div>
-        <div class="filtros-grid full" id="fGrupoUsuarioIng" style="display:{% if request.user.is_superuser %}block{% else %}none{% endif %};">
+        <div class="filtros-grid full" id="fGrupoUsuarioIng" style="display:{% if request.user.is_superuser or perms.facturas.ver_todo %}block{% else %}none{% endif %};">
             <div class="filtro-group">
                 <label>Usuario</label>
                 <select id="fUsuarioIng">
@@ -479,12 +479,12 @@ const TODOS_PAGE_SIZE = 25;
 // INIT
 // ══════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-    {% if request.user.is_superuser %}
+    {% if request.user.is_superuser or perms.facturas.ver_todo %}
     cargarUsuarios();
     {% endif %}
 });
 
-{% if request.user.is_superuser %}
+{% if request.user.is_superuser or perms.facturas.ver_todo %}
 async function cargarUsuarios() {
     try {
         const res = await fetch('/api/usuarios/');
@@ -604,7 +604,7 @@ function buildGastosParams(page, pageSize) {
     if (v('fTimbrado').trim())  p.set('timbrado', v('fTimbrado').trim());
     if (v('fNumeroFactura').trim()) p.set('numero_factura', v('fNumeroFactura').trim());
     if (v('fTipoFactura'))   p.set('tipo', v('fTipoFactura'));
-    {% if request.user.is_superuser %}
+    {% if request.user.is_superuser or perms.facturas.ver_todo %}
     if (v('fUsuario'))       p.set('usuario_id', v('fUsuario'));
     {% endif %}
     return p;
@@ -620,7 +620,7 @@ function buildIngresosParams(page, pageSize) {
     if (v('fHasta'))          p.set('hasta', v('fHasta'));
     if (v('fDescripcion').trim()) p.set('descripcion', v('fDescripcion').trim());
     if (v('fCategoria'))      p.set('categoria', v('fCategoria'));
-    {% if request.user.is_superuser %}
+    {% if request.user.is_superuser or perms.facturas.ver_todo %}
     if (v('fUsuarioIng'))     p.set('usuario_id', v('fUsuarioIng'));
     {% endif %}
     return p;
@@ -648,7 +648,7 @@ function renderTablaGastos(data) {
     document.getElementById('totLabel').textContent = `${data.total} factura(s)`;
     document.getElementById('totValor').textContent = `Gs. ${fmtNum(data.total_importe)}`;
 
-    const esAdmin = {% if request.user.is_superuser %}true{% else %}false{% endif %};
+    const esAdmin = {% if request.user.is_superuser or perms.facturas.ver_todo %}true{% else %}false{% endif %};
     let html = `<div class="tabla-card"><div style="overflow-x:auto;"><table><thead><tr>
         <th>Tipo</th>
         <th>Fecha</th>
@@ -712,7 +712,7 @@ function renderTablaIngresos(data) {
     document.getElementById('totLabel').textContent = `${data.total} ingreso(s)`;
     document.getElementById('totValor').textContent = `Gs. ${fmtNum(data.total_monto)}`;
 
-    const esAdmin = {% if request.user.is_superuser %}true{% else %}false{% endif %};
+    const esAdmin = {% if request.user.is_superuser or perms.facturas.ver_todo %}true{% else %}false{% endif %};
     let html = `<div class="tabla-card"><div style="overflow-x:auto;"><table><thead><tr>
         <th>Tipo</th>
         <th>Fecha</th>
@@ -796,7 +796,7 @@ function renderTablaTodosPagina() {
     const offset    = (todosPageActual - 1) * TODOS_PAGE_SIZE;
     const slice     = data.slice(offset, offset + TODOS_PAGE_SIZE);
 
-    const esAdmin = {% if request.user.is_superuser %}true{% else %}false{% endif %};
+    const esAdmin = {% if request.user.is_superuser or perms.facturas.ver_todo %}true{% else %}false{% endif %};
     let html = `<div class="tabla-card"><div style="overflow-x:auto;"><table><thead><tr>
         <th>Tipo</th>
         <th>Fecha</th>

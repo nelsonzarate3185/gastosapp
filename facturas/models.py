@@ -82,6 +82,9 @@ class Factura(models.Model):
         verbose_name = 'Factura'
         verbose_name_plural = 'Facturas'
         ordering = ['-creado']
+        permissions = [
+            ('ver_todo', 'Puede ver transacciones de todos los usuarios'),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=['usuario', 'ruc', 'timbrado', 'numero_factura'],

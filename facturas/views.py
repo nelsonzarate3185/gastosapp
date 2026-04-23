@@ -20,6 +20,11 @@ import csv
 import io
 from django.http import HttpResponse
 from django.db.models.functions import TruncMonth
+
+
+def _puede_ver_todo(user):
+    """True si el usuario puede ver transacciones de todos los usuarios."""
+    return user.is_superuser or user.has_perm('facturas.ver_todo')
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -213,7 +218,7 @@ class FacturaDetailView(APIView):
 
     def _get_factura(self, pk, user):
         try:
-            if user.is_superuser:
+            if _puede_ver_todo(user):
                 return Factura.objects.get(pk=pk)
             return Factura.objects.get(pk=pk, usuario=user)
         except Factura.DoesNotExist:
@@ -464,7 +469,7 @@ class FacturaReporteGastosView(APIView):
         qs = Factura.objects.select_related('usuario').order_by('-fecha_emision', '-creado')
 
         # Permisos: superuser ve todos, usuario normal solo los propios
-        if request.user.is_superuser:
+        if _puede_ver_todo(request.user):
             usuario_id = request.GET.get('usuario_id')
             if usuario_id:
                 qs = qs.filter(usuario_id=usuario_id)
@@ -562,7 +567,7 @@ class FacturaExportExcelView(APIView):
 
         qs = Factura.objects.select_related('usuario').order_by('fecha_emision', 'nombre_proveedor')
 
-        if request.user.is_superuser:
+        if _puede_ver_todo(request.user):
             usuario_id = request.GET.get('usuario_id')
             if usuario_id:
                 qs = qs.filter(usuario_id=usuario_id)
@@ -670,7 +675,7 @@ class FacturaExportCSVView(APIView):
 
         qs = Factura.objects.select_related('usuario').order_by('fecha_emision', 'nombre_proveedor')
 
-        if request.user.is_superuser:
+        if _puede_ver_todo(request.user):
             usuario_id = request.GET.get('usuario_id')
             if usuario_id:
                 qs = qs.filter(usuario_id=usuario_id)
@@ -718,7 +723,7 @@ class IngresoExportCSVView(APIView):
 
         qs = Ingreso.objects.select_related('usuario').order_by('fecha', 'descripcion')
 
-        if request.user.is_superuser:
+        if _puede_ver_todo(request.user):
             usuario_id = request.GET.get('usuario_id')
             if usuario_id:
                 qs = qs.filter(usuario_id=usuario_id)
@@ -778,7 +783,7 @@ class IngresoListCreateView(APIView):
 
         qs = Ingreso.objects.select_related('usuario').order_by('-fecha', '-creado')
 
-        if request.user.is_superuser:
+        if _puede_ver_todo(request.user):
             usuario_id = request.GET.get('usuario_id')
             if usuario_id:
                 qs = qs.filter(usuario_id=usuario_id)
@@ -848,7 +853,7 @@ class IngresoDetailView(APIView):
 
     def _get_ingreso(self, pk, user):
         try:
-            if user.is_superuser:
+            if _puede_ver_todo(user):
                 return Ingreso.objects.get(pk=pk)
             return Ingreso.objects.get(pk=pk, usuario=user)
         except Ingreso.DoesNotExist:
@@ -1099,101 +1104,116 @@ def _extract_spreadsheet_id(url_or_id: str) -> str | None:
     return None
 
 
+def _escribir_hoja_gastos(sh, ws_name, qs):
+    import gspread
+    headers = ['Fecha', 'Timbrado', 'N° Factura', 'RUC', 'Proveedor',
+               'Tipo', 'Importe (Gs.)', 'IVA (Gs.)', 'Estado', 'Notas']
+    try:
+        ws = sh.worksheet(ws_name)
+        ws.clear()
+    except gspread.exceptions.WorksheetNotFound:
+        ws = sh.add_worksheet(title=ws_name, rows=max(qs.count() + 10, 50), cols=10)
+    rows = [headers]
+    for f in qs:
+        rows.append([
+            f.fecha_emision.strftime('%d/%m/%Y') if f.fecha_emision else '',
+            f.timbrado or '',
+            f.numero_factura or '',
+            f.ruc.split('-')[0].strip() if f.ruc else '',
+            f.nombre_proveedor or '',
+            f.get_tipo_display(),
+            float(f.importe_total) if f.importe_total is not None else '',
+            float(f.importe_impuesto) if f.importe_impuesto is not None else '',
+            f.get_estado_display(),
+            f.notas or '',
+        ])
+    ws.update(rows, 'A1')
+
+
+def _escribir_hoja_ingresos(sh, ws_name, qs):
+    import gspread
+    headers = ['Fecha', 'Descripción', 'Categoría', 'Monto (Gs.)', 'Notas']
+    try:
+        ws = sh.worksheet(ws_name)
+        ws.clear()
+    except gspread.exceptions.WorksheetNotFound:
+        ws = sh.add_worksheet(title=ws_name, rows=max(qs.count() + 10, 50), cols=5)
+    rows = [headers]
+    for i in qs:
+        rows.append([
+            i.fecha.strftime('%d/%m/%Y') if i.fecha else '',
+            i.descripcion,
+            i.get_categoria_display(),
+            float(i.monto),
+            i.notas or '',
+        ])
+    ws.update(rows, 'A1')
+
+
 def _sincronizar_datos(user, config_obj):
     """
-    Empuja todos los registros del usuario a su Google Sheet.
-    Crea/actualiza hojas: 'Gastos YYYY' e 'Ingresos YYYY'.
-    Retorna dict con resumen.
+    Sincroniza a Google Sheets:
+    - Hojas consolidadas: 'Gastos YYYY', 'Ingresos YYYY'
+    - Hojas por usuario:  'Gastos YYYY username', 'Ingresos YYYY username'
+    Para usuarios con ver_todo: consolida todos los usuarios en las hojas generales.
     """
-    import gspread
-
     gc = _get_gspread_client(config_obj)
     sh = gc.open_by_key(config_obj.spreadsheet_id)
 
-    # ── Años con datos ────────────────────────────────────────────
-    factura_years = sorted(set(
-        Factura.objects
-        .filter(usuario=user, fecha_emision__isnull=False)
-        .values_list('fecha_emision__year', flat=True)
-        .distinct()
-    ), reverse=True)
-
-    ingreso_years = sorted(set(
-        Ingreso.objects
-        .filter(usuario=user)
-        .values_list('fecha__year', flat=True)
-        .distinct()
-    ), reverse=True)
+    ver_todo = _puede_ver_todo(user)
+    usuarios = list(
+        User.objects.filter(
+            Q(facturas__isnull=False) | Q(ingresos__isnull=False)
+        ).distinct().order_by('username')
+    ) if ver_todo else [user]
 
     hojas_escritas = []
 
-    # ── Gastos por año ────────────────────────────────────────────
-    HEADERS_GASTOS = ['Fecha', 'Timbrado', 'N° Factura', 'RUC', 'Proveedor',
-                      'Tipo', 'Importe (Gs.)', 'IVA (Gs.)', 'Estado', 'Notas']
+    factura_qs_base = Factura.objects.filter(usuario__in=usuarios, fecha_emision__isnull=False)
+    ingreso_qs_base = Ingreso.objects.filter(usuario__in=usuarios)
 
-    for year in factura_years:
+    # ── Hojas consolidadas por año ────────────────────────────────
+    for year in sorted(set(factura_qs_base.values_list('fecha_emision__year', flat=True)), reverse=True):
+        qs = factura_qs_base.filter(fecha_emision__year=year).order_by('fecha_emision', 'nombre_proveedor')
         ws_name = f'Gastos {year}'
-        qs = Factura.objects.filter(
-            usuario=user, fecha_emision__year=year
-        ).order_by('fecha_emision', 'nombre_proveedor')
-
-        try:
-            ws = sh.worksheet(ws_name)
-            ws.clear()
-        except gspread.exceptions.WorksheetNotFound:
-            ws = sh.add_worksheet(title=ws_name, rows=max(qs.count() + 10, 50), cols=10)
-
-        rows = [HEADERS_GASTOS]
-        for f in qs:
-            rows.append([
-                f.fecha_emision.strftime('%d/%m/%Y') if f.fecha_emision else '',
-                f.timbrado or '',
-                f.numero_factura or '',
-                f.ruc.split('-')[0].strip() if f.ruc else '',
-                f.nombre_proveedor or '',
-                f.get_tipo_display(),
-                float(f.importe_total) if f.importe_total is not None else '',
-                float(f.importe_impuesto) if f.importe_impuesto is not None else '',
-                f.get_estado_display(),
-                f.notas or '',
-            ])
-        ws.update(rows, 'A1')
+        _escribir_hoja_gastos(sh, ws_name, qs)
         hojas_escritas.append(ws_name)
 
-    # ── Ingresos por año ──────────────────────────────────────────
-    HEADERS_INGRESOS = ['Fecha', 'Descripción', 'Categoría', 'Monto (Gs.)', 'Notas']
-
-    for year in ingreso_years:
+    for year in sorted(set(ingreso_qs_base.values_list('fecha__year', flat=True)), reverse=True):
+        qs = ingreso_qs_base.filter(fecha__year=year).order_by('fecha', 'descripcion')
         ws_name = f'Ingresos {year}'
-        qs = Ingreso.objects.filter(
-            usuario=user, fecha__year=year
-        ).order_by('fecha', 'descripcion')
-
-        try:
-            ws = sh.worksheet(ws_name)
-            ws.clear()
-        except gspread.exceptions.WorksheetNotFound:
-            ws = sh.add_worksheet(title=ws_name, rows=max(qs.count() + 10, 50), cols=5)
-
-        rows = [HEADERS_INGRESOS]
-        for i in qs:
-            rows.append([
-                i.fecha.strftime('%d/%m/%Y') if i.fecha else '',
-                i.descripcion,
-                i.get_categoria_display(),
-                float(i.monto),
-                i.notas or '',
-            ])
-        ws.update(rows, 'A1')
+        _escribir_hoja_ingresos(sh, ws_name, qs)
         hojas_escritas.append(ws_name)
+
+    # ── Hojas individuales por usuario ────────────────────────────
+    for u in usuarios:
+        uname = u.username
+
+        for year in sorted(set(
+            Factura.objects.filter(usuario=u, fecha_emision__isnull=False)
+            .values_list('fecha_emision__year', flat=True)
+        ), reverse=True):
+            qs = Factura.objects.filter(usuario=u, fecha_emision__year=year).order_by('fecha_emision', 'nombre_proveedor')
+            ws_name = f'Gastos {year} {uname}'
+            _escribir_hoja_gastos(sh, ws_name, qs)
+            hojas_escritas.append(ws_name)
+
+        for year in sorted(set(
+            Ingreso.objects.filter(usuario=u)
+            .values_list('fecha__year', flat=True)
+        ), reverse=True):
+            qs = Ingreso.objects.filter(usuario=u, fecha__year=year).order_by('fecha', 'descripcion')
+            ws_name = f'Ingresos {year} {uname}'
+            _escribir_hoja_ingresos(sh, ws_name, qs)
+            hojas_escritas.append(ws_name)
 
     config_obj.ultima_sincronizacion = timezone.now()
     config_obj.save(update_fields=['ultima_sincronizacion'])
 
     return {
         'hojas': hojas_escritas,
-        'total_facturas': Factura.objects.filter(usuario=user).count(),
-        'total_ingresos': Ingreso.objects.filter(usuario=user).count(),
+        'total_facturas': factura_qs_base.count(),
+        'total_ingresos': ingreso_qs_base.count(),
     }
 
 
@@ -1385,7 +1405,7 @@ class ReporteDashboardView(APIView):
         # Determinar qué usuario filtrar
         # Si es superuser puede ver cualquier usuario
         usuario_id = request.GET.get('usuario_id')
-        if usuario_id and request.user.is_superuser:
+        if usuario_id and _puede_ver_todo(request.user):
             try:
                 usuario_filtro = User.objects.get(pk=usuario_id)
             except User.DoesNotExist:

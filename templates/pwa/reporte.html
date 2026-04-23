@@ -261,7 +261,7 @@ td.cero     { color:#bbb; }
                 <input type="text" id="gProveedor" placeholder="Búsqueda parcial...">
             </div>
         </div>
-        {% if request.user.is_superuser %}
+        {% if request.user.is_superuser or perms.facturas.ver_todo %}
         <div class="filtros-grid full" style="margin-bottom:10px;">
             <div class="filtro-group">
                 <label>Usuario</label>
@@ -305,7 +305,7 @@ td.cero     { color:#bbb; }
                 <input type="date" id="iHasta">
             </div>
         </div>
-        {% if request.user.is_superuser %}
+        {% if request.user.is_superuser or perms.facturas.ver_todo %}
         <div class="filtros-grid full" style="margin-bottom:10px;">
             <div class="filtro-group">
                 <label>Usuario</label>
@@ -444,7 +444,7 @@ td.cero     { color:#bbb; }
 </div>
 
 <script>
-const esSuperuser = {{ request.user.is_superuser|yesno:"true,false" }};
+const esSuperuser = {{ request.user.is_superuser|yesno:"true,false" }} || {{ perms.facturas.ver_todo|yesno:"true,false" }};
 let gastosPage = 1;
 let gastosPageSize = 50;
 
