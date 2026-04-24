@@ -116,6 +116,7 @@ TESSERACT_CMD = config(
 
 # ✅ OCR API KEY corregido
 OCR_API_KEY = config('OCR_API_KEY', default='helloworld')
+ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
 # ── Google OAuth2 (para sincronización con Google Sheets) ─────────────────────
 GOOGLE_CLIENT_ID      = config('GOOGLE_CLIENT_ID', default='')

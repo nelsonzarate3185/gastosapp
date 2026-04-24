@@ -68,90 +68,160 @@ def ocr_con_api(imagen):
     return parsed[0].get('ParsedText', '')
 
 
+def _limpiar_monto(s):
+    """'1.901.004' → 1901004.0  |  '220.000' → 220000.0"""
+    if not s:
+        return None
+    s = str(s).strip()
+    # Si tiene más de un punto, son separadores de miles
+    if s.count('.') > 1:
+        s = s.replace('.', '').replace(',', '')
+    else:
+        s = s.replace('.', '').replace(',', '')
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
 def extraer_datos_ocr(texto):
+    """Extracción regex de campos de facturas paraguayas."""
+    from datetime import datetime as _dt
+
     datos = {
-        'texto_ocr': texto,
+        'texto_ocr':        texto,
         'nombre_proveedor': '',
-        'timbrado': '',
-        'ruc': '',
-        'importe_total': None,
-        'fecha_emision': None,
+        'timbrado':         '',
+        'ruc':              '',
+        'numero_factura':   '',
+        'importe_total':    None,
+        'importe_impuesto': None,
+        'fecha_emision':    None,
     }
 
-    lineas = texto.upper().split('\n')
+    if not texto:
+        return datos
+
     texto_upper = texto.upper()
+    lineas_orig = [l.strip() for l in texto.split('\n') if l.strip()]
 
-    timbrado = re.search(r'TIMBRADO\s*N[°º]?\s*(\d{6,8})', texto_upper)
-    if timbrado:
-        datos['timbrado'] = timbrado.group(1)
+    # ── RUC del EMISOR ────────────────────────────────────────────
+    # "RUC: 4934368 - 8"  |  "RUC: 80014137-7"
+    ruc_m = re.search(r'RUC[^:\d\n]{0,10}[:\s]+(\d{5,8})\s*[-–]\s*(\d)', texto_upper)
+    if not ruc_m:
+        ruc_m = re.search(r'\b(\d{7,8})\s*[-–]\s*(\d)\b', texto)
+    if ruc_m:
+        datos['ruc'] = f"{ruc_m.group(1)}-{ruc_m.group(2)}"
+
+    # ── Timbrado ──────────────────────────────────────────────────
+    # "TIMBRADO N° 18733343"  |  "Timbrado Nº: 16087162"
+    tim_m = re.search(r'TIMBRADO[^:\d\n]{0,6}[N°Nº#:\s]+(\d{7,10})', texto_upper)
+    if tim_m:
+        datos['timbrado'] = tim_m.group(1)
     else:
-        timbrado2 = re.search(r'\b(\d{8})\b', texto)
-        if timbrado2:
-            datos['timbrado'] = timbrado2.group(1)
+        # Número de 8 dígitos standalone (formato más común PY)
+        tim2 = re.search(r'\b(\d{8})\b', texto)
+        if tim2:
+            datos['timbrado'] = tim2.group(1)
 
-    ruc = re.search(r'RUC[:\s]*(\d{5,8}-\d{1})', texto_upper)
-    if ruc:
-        datos['ruc'] = ruc.group(1)
-    else:
-        ruc2 = re.search(r'\b(\d{5,8}-\d{1})\b', texto)
-        if ruc2:
-            datos['ruc'] = ruc2.group(1)
+    # ── Número de factura ─────────────────────────────────────────
+    # "001-001-0000508"  |  "001-001 0000508"  |  "016-004-0034087"
+    nro_m = re.search(r'\b(\d{3})\s*[-]\s*(\d{3})\s*[-\s]\s*(\d{7})\b', texto)
+    if nro_m:
+        datos['numero_factura'] = f"{nro_m.group(1)}-{nro_m.group(2)}-{nro_m.group(3)}"
 
-    for i, linea in enumerate(lineas):
-        if any(p in linea for p in ['CASA', 'EMPRESA', 'S.A', 'S.R.L', 'CONSORCIO', 'COMERCIAL']):
-            if i + 1 < len(lineas) and len(lineas[i+1].strip()) > 3:
-                datos['nombre_proveedor'] = lineas[i+1].strip().title()
-            else:
-                datos['nombre_proveedor'] = linea.strip().title()
+    # ── Nombre del proveedor ──────────────────────────────────────
+    TIPOS = r'S\.A\.E\.C\.A\.|S\.R\.L\.|S\.A\.|LTDA\.?|E\.I\.R\.L\.|S\.C\.S\.|SAECA'
+    for linea in lineas_orig[:15]:
+        if re.search(TIPOS, linea.upper()):
+            datos['nombre_proveedor'] = linea.strip()
             break
 
     if not datos['nombre_proveedor']:
-        razon = re.search(r'NOMBRE O RAZ[OÓ]N SOCIAL[:\s]*(.+)', texto_upper)
-        if razon:
-            datos['nombre_proveedor'] = razon.group(1).strip().title()
+        razon_m = re.search(r'(?:NOMBRE\s+O\s+)?RAZ[ÓO]N\s+SOCIAL[:\s]+(.+)', texto_upper)
+        if razon_m:
+            datos['nombre_proveedor'] = razon_m.group(1).strip().title()
 
-    total = re.search(r'TOTAL A PAGAR[:\s]*([\d.,]+)', texto_upper)
-    if total:
-        monto_str = total.group(1).replace('.', '').replace(',', '').strip()
+    if not datos['nombre_proveedor']:
+        # Primera línea significativa que no sea un encabezado conocido
+        skip = re.compile(r'^(RUC|TIMBRADO|FACTURA|FECHA|KUDE|KuDE|INICIO|FIN\s+DE|N[°º]|TEL[EÉ]F|EMAIL|DIRECCI)', re.I)
+        for linea in lineas_orig[:8]:
+            if len(linea) > 6 and not skip.match(linea):
+                datos['nombre_proveedor'] = linea.strip()
+                break
+
+    # ── Importe total ─────────────────────────────────────────────
+    patrones_total = [
+        r'TOTAL\s+(?:A\s+PAGAR\s+GUARAN[IÍ]ES?\b[^0-9]{0,40})([\d][.\d\s]+)',
+        r'TOTAL\s+DE\s+LA\s+OPERACI[ÓO]N[^\d]{0,10}([\d][.\d]+)',
+        r'TOTAL\s+A\s+PAGAR[^\d]{0,10}([\d][.\d]+)',
+        r'TOTAL\s+PAGAR[^\d]{0,10}([\d][.\d]+)',
+    ]
+    for pat in patrones_total:
+        m = re.search(pat, texto_upper)
+        if m:
+            val = _limpiar_monto(m.group(1).replace(' ', ''))
+            if val:
+                datos['importe_total'] = val
+                break
+
+    if datos['importe_total'] is None:
+        # Fallback: número más grande en formato guaraní NNN.NNN o NNNN.NNN
+        montos = re.findall(r'\b(\d{1,3}(?:\.\d{3})+)\b', texto)
+        valores = [_limpiar_monto(m) for m in montos if _limpiar_monto(m)]
+        if valores:
+            datos['importe_total'] = max(valores)
+
+    # ── IVA / Impuesto ────────────────────────────────────────────
+    patrones_iva = [
+        r'TOTAL\s+IVA[^\d]{0,10}([\d][.\d]+)',
+        r'LIQUIDACI[ÓO]N\s+IVA[^%\d]{0,20}10%[^\d]{0,10}([\d][.\d]+)',
+        r'IVA\s+10%[^\d]{0,10}([\d][.\d]+)',
+        r'IVA\s+5%[^\d]{0,10}([\d][.\d]+)',
+    ]
+    for pat in patrones_iva:
+        m = re.search(pat, texto_upper)
+        if m:
+            val = _limpiar_monto(m.group(1))
+            if val:
+                datos['importe_impuesto'] = val
+                break
+
+    # ── Fecha de emisión ──────────────────────────────────────────
+    # DD/MM/YYYY
+    fecha_m = re.search(r'\b(\d{2})[/](\d{2})[/](\d{4})\b', texto)
+    if fecha_m:
         try:
-            datos['importe_total'] = float(monto_str)
+            datos['fecha_emision'] = _dt(
+                int(fecha_m.group(3)), int(fecha_m.group(2)), int(fecha_m.group(1))
+            ).date()
         except ValueError:
             pass
-    else:
-        montos = re.findall(r'\b(\d{3,3}\.\d{3})\b', texto)
-        if montos:
-            monto_str = montos[-1].replace('.', '')
+
+    if not datos['fecha_emision']:
+        # DD/MM/YY
+        fecha_m2 = re.search(r'\b(\d{2})[/](\d{2})[/](\d{2})\b', texto)
+        if fecha_m2:
             try:
-                datos['importe_total'] = float(monto_str)
+                datos['fecha_emision'] = _dt(
+                    2000 + int(fecha_m2.group(3)), int(fecha_m2.group(2)), int(fecha_m2.group(1))
+                ).date()
             except ValueError:
                 pass
 
-    fecha = re.search(r'\b(\d{2}/\d{2}/\d{4})\b', texto)
-    if fecha:
-        from datetime import datetime
-        try:
-            datos['fecha_emision'] = datetime.strptime(fecha.group(), '%d/%m/%Y').date()
-        except ValueError:
-            pass
-    else:
-        meses = {
-            'ENERO': '01', 'FEBRERO': '02', 'MARZO': '03',
-            'ABRIL': '04', 'MAYO': '05', 'JUNIO': '06',
-            'JULIO': '07', 'AGOSTO': '08', 'SEPTIEMBRE': '09',
-            'OCTUBRE': '10', 'NOVIEMBRE': '11', 'DICIEMBRE': '12'
-        }
-        fecha_escrita = re.search(
-            r'(\d{1,2})\s+DE\s+(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\s+(\d{4})',
+    if not datos['fecha_emision']:
+        meses = {'ENERO':'01','FEBRERO':'02','MARZO':'03','ABRIL':'04','MAYO':'05',
+                 'JUNIO':'06','JULIO':'07','AGOSTO':'08','SEPTIEMBRE':'09',
+                 'OCTUBRE':'10','NOVIEMBRE':'11','DICIEMBRE':'12'}
+        fm = re.search(
+            r'(\d{1,2})\s+(?:DE\s+)?(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|'
+            r'AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\s+(?:DE\s+)?(\d{4})',
             texto_upper
         )
-        if fecha_escrita:
-            from datetime import datetime
-            dia = fecha_escrita.group(1).zfill(2)
-            mes = meses[fecha_escrita.group(2)]
-            anio = fecha_escrita.group(3)
+        if fm:
             try:
-                datos['fecha_emision'] = datetime.strptime(
-                    f"{dia}/{mes}/{anio}", '%d/%m/%Y'
+                datos['fecha_emision'] = _dt(
+                    int(fm.group(3)), int(meses[fm.group(2)]), int(fm.group(1))
                 ).date()
             except ValueError:
                 pass
@@ -160,15 +230,42 @@ def extraer_datos_ocr(texto):
 
 
 # ══════════════════════════════════════════════════════
-# FACTURAS - ENDPOINTS API
+# PREPROCESAMIENTO DE IMAGEN
+# ══════════════════════════════════════════════════════
+
+def preprocesar_imagen(imagen):
+    """Escala de grises + contraste + nitidez para mejorar OCR."""
+    from PIL import Image, ImageEnhance, ImageFilter
+    import io
+
+    img = Image.open(imagen)
+    if img.mode not in ('L', 'RGB'):
+        img = img.convert('RGB')
+    img = img.convert('L')
+
+    w, h = img.size
+    if w < 1200:
+        factor = 1200 / w
+        img = img.resize((int(w * factor), int(h * factor)), Image.LANCZOS)
+
+    img = ImageEnhance.Contrast(img).enhance(2.0)
+    img = ImageEnhance.Sharpness(img).enhance(2.0)
+    img = img.filter(ImageFilter.SHARPEN)
+
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return buf
+
+
+# ══════════════════════════════════════════════════════
+# OCR TESSERACT (FALLBACK)
 # ══════════════════════════════════════════════════════
 
 def ocr_con_tesseract(imagen):
-    """OCR local con pytesseract como fallback."""
     import pytesseract
     from PIL import Image as PILImage
-    import shutil
-    import os
+    import shutil, os
 
     cmd = settings.TESSERACT_CMD
     if not os.path.exists(cmd):
@@ -176,14 +273,103 @@ def ocr_con_tesseract(imagen):
     pytesseract.pytesseract.tesseract_cmd = cmd
 
     img = PILImage.open(imagen)
+    config = r'--oem 3 --psm 6'
     try:
-        return pytesseract.image_to_string(img, lang='spa')
+        return pytesseract.image_to_string(img, lang='spa', config=config)
     except pytesseract.TesseractError:
-        return pytesseract.image_to_string(img)
+        return pytesseract.image_to_string(img, config=config)
 
+
+# ══════════════════════════════════════════════════════
+# EXTRACCIÓN CON IA (CLAUDE)
+# ══════════════════════════════════════════════════════
+
+_PROMPT_OCR = """Sos un experto en facturas paraguayas. Del texto OCR extraé los campos indicados.
+
+TIPOS DE DOCUMENTOS:
+- Factura física: Timbrado DNIT, RUC emisor, número NNN-NNN-NNNNNNN
+- KuDE (electrónica): misma estructura pero formato digital
+
+REGLAS:
+- ruc: del EMISOR (quien vende), no del comprador. Formato NNNNNNN-N (ej: "4934368-8")
+- timbrado: número de resolución DNIT, 7-10 dígitos (ej: "18733343")
+- numero_factura: formato NNN-NNN-NNNNNNN (ej: "001-001-0000508")
+- fecha_emision: convertir a YYYY-MM-DD
+- importe_total: número entero sin separadores (ej: 70000, 1901004, 220000)
+- importe_impuesto: total IVA, número entero. null si no figura
+- Si un campo no aparece con certeza → null. No inventes.
+
+TEXTO OCR:
+{texto}
+
+Respondé SOLO con JSON válido, sin texto adicional:
+{{
+  "nombre_proveedor": null,
+  "ruc": null,
+  "timbrado": null,
+  "numero_factura": null,
+  "fecha_emision": null,
+  "importe_total": null,
+  "importe_impuesto": null
+}}"""
+
+
+def extraer_con_ia(texto_ocr):
+    """Segunda capa: Claude interpreta el texto OCR y devuelve campos estructurados."""
+    import anthropic, json as _json
+
+    api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
+    if not api_key or not texto_ocr.strip():
+        return {}
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=512,
+            messages=[{'role': 'user', 'content': _PROMPT_OCR.format(texto=texto_ocr[:3000])}],
+        )
+        respuesta = msg.content[0].text.strip()
+
+        # Extraer JSON de la respuesta
+        m = re.search(r'\{[^{}]*\}', respuesta, re.DOTALL)
+        if not m:
+            return {}
+        datos_ia = _json.loads(m.group())
+
+        # Convertir importe_* que vengan como strings
+        for campo in ('importe_total', 'importe_impuesto'):
+            v = datos_ia.get(campo)
+            if isinstance(v, str):
+                datos_ia[campo] = _limpiar_monto(v)
+
+        # Convertir fecha a objeto date
+        if datos_ia.get('fecha_emision'):
+            from datetime import datetime as _dt
+            try:
+                datos_ia['fecha_emision'] = _dt.strptime(
+                    datos_ia['fecha_emision'], '%Y-%m-%d'
+                ).date()
+            except (ValueError, TypeError):
+                datos_ia['fecha_emision'] = None
+
+        return datos_ia
+
+    except Exception:
+        return {}
+
+
+# ══════════════════════════════════════════════════════
+# FACTURAS - ENDPOINTS API
+# ══════════════════════════════════════════════════════
 
 class FacturaUploadView(APIView):
-    """Procesa imagen con OCR y devuelve datos extraídos (sin guardar)."""
+    """
+    Pipeline OCR:
+    1. Preprocesar imagen
+    2. OCR.space API  (falla → Tesseract con imagen preprocesada)
+    3. Extracción regex  +  Claude IA (prioridad sobre regex)
+    """
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
@@ -194,22 +380,31 @@ class FacturaUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        texto = ''
-        fuente = 'api'
-        aviso = ''
+        # ── 1. Preprocesar ────────────────────────────────────────
+        imagen.seek(0)
+        imagen_proc = preprocesar_imagen(imagen)
 
+        # ── 2. OCR ───────────────────────────────────────────────
+        texto, fuente, aviso = '', 'api', ''
         try:
+            imagen.seek(0)
             texto = ocr_con_api(imagen)
         except Exception:
-            imagen.seek(0)
             try:
-                texto = ocr_con_tesseract(imagen)
+                texto = ocr_con_tesseract(imagen_proc)
                 fuente = 'tesseract'
             except Exception:
                 fuente = 'ninguno'
                 aviso = 'OCR no disponible. Podés completar los datos manualmente.'
 
+        # ── 3. Extracción ─────────────────────────────────────────
         datos = extraer_datos_ocr(texto)
+
+        datos_ia = extraer_con_ia(texto)
+        for campo, valor in datos_ia.items():
+            if valor is not None and valor != '' and campo in datos:
+                datos[campo] = valor   # IA tiene prioridad sobre regex
+
         resp = {'texto_ocr': texto, 'datos_extraidos': datos, 'fuente_ocr': fuente}
         if aviso:
             resp['aviso'] = aviso
