@@ -18,8 +18,11 @@ import requests
 import re
 import csv
 import io
+import logging
 from django.http import HttpResponse
 from django.db.models.functions import TruncMonth
+
+logger = logging.getLogger(__name__)
 
 
 def _puede_ver_todo(user):
@@ -386,14 +389,30 @@ Respondé SOLO con JSON válido, sin texto adicional:
 def extraer_con_ia_vision(imagen_buf):
     """Claude lee la imagen directamente (Vision) cuando el OCR no extrajo texto."""
     import anthropic, base64
+    from PIL import Image as PILImage
 
     api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
     if not api_key:
+        logger.warning('ANTHROPIC_API_KEY no configurada; Vision desactivado.')
         return {}
 
     try:
+        # Convertir a JPEG RGB para reducir tamaño y maximizar compatibilidad
         imagen_buf.seek(0)
-        image_data = base64.standard_b64encode(imagen_buf.read()).decode('utf-8')
+        img = PILImage.open(imagen_buf)
+        if img.mode not in ('RGB', 'L'):
+            img = img.convert('RGB')
+        elif img.mode == 'L':
+            img = img.convert('RGB')
+        # Escalar si es muy grande (máx 1600px)
+        w, h = img.size
+        if max(w, h) > 1600:
+            factor = 1600 / max(w, h)
+            img = img.resize((int(w * factor), int(h * factor)), PILImage.LANCZOS)
+        buf_jpg = io.BytesIO()
+        img.save(buf_jpg, format='JPEG', quality=90)
+        buf_jpg.seek(0)
+        image_data = base64.standard_b64encode(buf_jpg.read()).decode('utf-8')
 
         client = anthropic.Anthropic(api_key=api_key)
         msg = client.messages.create(
@@ -406,7 +425,7 @@ def extraer_con_ia_vision(imagen_buf):
                         'type': 'image',
                         'source': {
                             'type': 'base64',
-                            'media_type': 'image/png',
+                            'media_type': 'image/jpeg',
                             'data': image_data,
                         },
                     },
@@ -414,8 +433,11 @@ def extraer_con_ia_vision(imagen_buf):
                 ],
             }],
         )
-        return _parsear_respuesta_ia(msg.content[0].text.strip())
-    except Exception:
+        resultado = _parsear_respuesta_ia(msg.content[0].text.strip())
+        logger.info('Vision IA extrajo: %s', resultado)
+        return resultado
+    except Exception as exc:
+        logger.error('Error en Vision IA: %s', exc, exc_info=True)
         return {}
 
 
@@ -440,21 +462,27 @@ class FacturaUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # ── 1. Preprocesar ────────────────────────────────────────
+        # ── 1. Preprocesar (para Tesseract/Vision) ────────────────
         imagen.seek(0)
         imagen_proc = preprocesar_imagen(imagen)
 
         # ── 2. OCR ───────────────────────────────────────────────
+        # OCR.space recibe la imagen original (JPEG del cliente, mejor para cloud OCR)
+        # Tesseract y Vision reciben la imagen preprocesada (contraste mejorado)
         texto, fuente, aviso = '', 'api', ''
         try:
-            imagen_proc.seek(0)
-            texto = ocr_con_api(('factura.png', imagen_proc, 'image/png'))
-        except Exception:
+            imagen.seek(0)
+            texto = ocr_con_api(imagen)
+            logger.info('OCR.space extrajo %d chars', len(texto))
+        except Exception as exc:
+            logger.warning('OCR.space falló: %s', exc)
             try:
                 imagen_proc.seek(0)
                 texto = ocr_con_tesseract(imagen_proc)
                 fuente = 'tesseract'
-            except Exception:
+                logger.info('Tesseract extrajo %d chars', len(texto))
+            except Exception as exc2:
+                logger.warning('Tesseract falló: %s', exc2)
                 fuente = 'ninguno'
                 aviso = 'OCR no disponible. Podés completar los datos manualmente.'
 
@@ -465,10 +493,10 @@ class FacturaUploadView(APIView):
             # Tenemos texto OCR: Claude lo interpreta
             datos_ia = extraer_con_ia(texto)
         else:
-            # Sin texto: Claude lee la imagen directamente (Vision)
+            # Sin texto: Claude Vision lee la imagen directamente
             imagen_proc.seek(0)
             datos_ia = extraer_con_ia_vision(imagen_proc)
-            if datos_ia:
+            if datos_ia and any(v for v in datos_ia.values() if v is not None):
                 fuente = 'ia_vision'
                 aviso = ''
             elif fuente != 'ninguno':
