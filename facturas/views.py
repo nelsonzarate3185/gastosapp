@@ -314,9 +314,35 @@ Respondé SOLO con JSON válido, sin texto adicional:
 }}"""
 
 
+def _parsear_respuesta_ia(respuesta):
+    """Parsea el JSON de respuesta de Claude y normaliza los campos."""
+    import json as _json
+    from datetime import datetime as _dt
+
+    m = re.search(r'\{[\s\S]*\}', respuesta)
+    if not m:
+        return {}
+    datos_ia = _json.loads(m.group())
+
+    for campo in ('importe_total', 'importe_impuesto'):
+        v = datos_ia.get(campo)
+        if isinstance(v, str):
+            datos_ia[campo] = _limpiar_monto(v)
+
+    if datos_ia.get('fecha_emision'):
+        try:
+            datos_ia['fecha_emision'] = _dt.strptime(
+                str(datos_ia['fecha_emision']), '%Y-%m-%d'
+            ).date()
+        except (ValueError, TypeError):
+            datos_ia['fecha_emision'] = None
+
+    return datos_ia
+
+
 def extraer_con_ia(texto_ocr):
-    """Segunda capa: Claude interpreta el texto OCR y devuelve campos estructurados."""
-    import anthropic, json as _json
+    """Claude interpreta el texto OCR y devuelve campos estructurados."""
+    import anthropic
 
     api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
     if not api_key or not texto_ocr.strip():
@@ -329,32 +355,66 @@ def extraer_con_ia(texto_ocr):
             max_tokens=512,
             messages=[{'role': 'user', 'content': _PROMPT_OCR.format(texto=texto_ocr[:3000])}],
         )
-        respuesta = msg.content[0].text.strip()
+        return _parsear_respuesta_ia(msg.content[0].text.strip())
+    except Exception:
+        return {}
 
-        # Extraer JSON de la respuesta
-        m = re.search(r'\{[^{}]*\}', respuesta, re.DOTALL)
-        if not m:
-            return {}
-        datos_ia = _json.loads(m.group())
 
-        # Convertir importe_* que vengan como strings
-        for campo in ('importe_total', 'importe_impuesto'):
-            v = datos_ia.get(campo)
-            if isinstance(v, str):
-                datos_ia[campo] = _limpiar_monto(v)
+_PROMPT_OCR_VISION = """Sos un experto en facturas paraguayas. Analizá esta imagen de factura y extraé los campos indicados.
 
-        # Convertir fecha a objeto date
-        if datos_ia.get('fecha_emision'):
-            from datetime import datetime as _dt
-            try:
-                datos_ia['fecha_emision'] = _dt.strptime(
-                    datos_ia['fecha_emision'], '%Y-%m-%d'
-                ).date()
-            except (ValueError, TypeError):
-                datos_ia['fecha_emision'] = None
+CAMPOS A EXTRAER:
+- nombre_proveedor: nombre o razón social del EMISOR (quien vende)
+- ruc: RUC del EMISOR, formato NNNNNNN-N (ej: "4934368-8" o "80014137-7")
+- timbrado: número de timbrado DNIT, 7-10 dígitos (ej: "18733343")
+- numero_factura: formato NNN-NNN-NNNNNNN (ej: "001-001-0000508")
+- fecha_emision: fecha en formato YYYY-MM-DD
+- importe_total: monto total en guaraníes, número entero sin separadores (ej: 70000)
+- importe_impuesto: total IVA, número entero. null si no figura claramente
 
-        return datos_ia
+Respondé SOLO con JSON válido, sin texto adicional:
+{
+  "nombre_proveedor": null,
+  "ruc": null,
+  "timbrado": null,
+  "numero_factura": null,
+  "fecha_emision": null,
+  "importe_total": null,
+  "importe_impuesto": null
+}"""
 
+
+def extraer_con_ia_vision(imagen_buf):
+    """Claude lee la imagen directamente (Vision) cuando el OCR no extrajo texto."""
+    import anthropic, base64
+
+    api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
+    if not api_key:
+        return {}
+
+    try:
+        imagen_buf.seek(0)
+        image_data = base64.standard_b64encode(imagen_buf.read()).decode('utf-8')
+
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=512,
+            messages=[{
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'image',
+                        'source': {
+                            'type': 'base64',
+                            'media_type': 'image/png',
+                            'data': image_data,
+                        },
+                    },
+                    {'type': 'text', 'text': _PROMPT_OCR_VISION},
+                ],
+            }],
+        )
+        return _parsear_respuesta_ia(msg.content[0].text.strip())
     except Exception:
         return {}
 
@@ -398,16 +458,25 @@ class FacturaUploadView(APIView):
                 fuente = 'ninguno'
                 aviso = 'OCR no disponible. Podés completar los datos manualmente.'
 
-        if not texto.strip() and fuente != 'ninguno':
-            aviso = 'OCR no pudo leer texto de la imagen. Revisá que la foto sea clara y completá los datos manualmente.'
-
         # ── 3. Extracción ─────────────────────────────────────────
         datos = extraer_datos_ocr(texto)
 
-        datos_ia = extraer_con_ia(texto)
+        if texto.strip():
+            # Tenemos texto OCR: Claude lo interpreta
+            datos_ia = extraer_con_ia(texto)
+        else:
+            # Sin texto: Claude lee la imagen directamente (Vision)
+            imagen_proc.seek(0)
+            datos_ia = extraer_con_ia_vision(imagen_proc)
+            if datos_ia:
+                fuente = 'ia_vision'
+                aviso = ''
+            elif fuente != 'ninguno':
+                aviso = 'No se pudo leer la imagen. Completá los datos manualmente.'
+
         for campo, valor in datos_ia.items():
             if valor is not None and valor != '' and campo in datos:
-                datos[campo] = valor   # IA tiene prioridad sobre regex
+                datos[campo] = valor
 
         resp = {'texto_ocr': texto, 'datos_extraidos': datos, 'fuente_ocr': fuente}
         if aviso:

@@ -155,6 +155,7 @@
     font-size: 11px; color: #1a73e8; font-weight: 600;
     background: #e8f0fe; padding: 2px 7px; border-radius: 10px; margin-left: 6px;
 }
+.ocr-tag.ia { color: #7b1fa2; background: #f3e5f5; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .btn-row { display: flex; gap: 10px; margin-top: 18px; }
 .btn-confirmar {
@@ -872,11 +873,14 @@ async function procesarFactura() {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('cardUpload').style.display = 'none';
             document.getElementById('ocrPreview').style.display = 'block';
+            const h2 = document.querySelector('#ocrPreview h2');
+            const sub = document.querySelector('#ocrPreview p.subtitle');
             if (data.aviso) {
-                const h2 = document.querySelector('#ocrPreview h2');
-                const sub = document.querySelector('#ocrPreview p.subtitle');
                 if (h2) h2.textContent = '✏️ Completá los datos manualmente';
                 if (sub) sub.textContent = data.aviso;
+            } else if (data.fuente_ocr === 'ia_vision') {
+                if (h2) h2.textContent = '✏️ Revisá los datos extraídos';
+                if (sub) sub.innerHTML = 'Los campos con <span class="ocr-tag">IA</span> fueron detectados por inteligencia artificial.';
             }
         } else {
             alert('Error: ' + (data.error || 'No se pudo procesar.'));
