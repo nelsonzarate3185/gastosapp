@@ -108,6 +108,17 @@ FILE_UPLOAD_MAX_MEMORY_SIZE  = 10 * 1024 * 1024   # 10 MB
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler'},
+    },
+    'loggers': {
+        'facturas': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+    },
+}
+
 # ── Tesseract OCR ─────────────────────────────────────────────────────────────
 TESSERACT_CMD = config(
     'TESSERACT_CMD',

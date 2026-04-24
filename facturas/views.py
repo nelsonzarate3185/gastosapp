@@ -40,17 +40,22 @@ from openpyxl.utils import get_column_letter
 def ocr_con_api(imagen):
     api_key = settings.OCR_API_KEY
     ssl_verify = getattr(settings, 'SSL_VERIFY', True)
+
+    # Leer bytes explícitamente para evitar problemas con InMemoryUploadedFile
+    if hasattr(imagen, 'seek'):
+        imagen.seek(0)
+    img_bytes = imagen.read() if hasattr(imagen, 'read') else imagen[1].read()
+    img_name = getattr(imagen, 'name', 'factura.jpg') or 'factura.jpg'
+    img_type = getattr(imagen, 'content_type', 'image/jpeg') or 'image/jpeg'
+
     try:
         response = requests.post(
             'https://api.ocr.space/parse/image',
-            files={'image': imagen},
+            files={'file': (img_name, img_bytes, img_type)},
             data={
                 'apikey': api_key,
                 'language': 'spa',
-                'isOverlayRequired': False,
-                'scale': True,
-                'detectOrientation': True,
-                'OCREngine': 2,
+                'isOverlayRequired': 'false',
             },
             timeout=30,
             verify=ssl_verify,
@@ -60,6 +65,8 @@ def ocr_con_api(imagen):
     except requests.exceptions.ConnectionError:
         raise Exception('No se pudo conectar al servicio OCR. Verificá la conexión.')
 
+    logger.info('OCR.space HTTP %s | body[:200]: %s', response.status_code, response.text[:200])
+
     try:
         result = response.json()
     except ValueError:
@@ -68,12 +75,22 @@ def ocr_con_api(imagen):
             'Es posible que se haya superado el límite de uso del API key gratuito.'
         )
 
+    logger.info('OCR.space JSON: IsError=%s | ParsedResults=%s | ExitCode=%s',
+                result.get('IsErroredOnProcessing'),
+                len(result.get('ParsedResults') or []),
+                result.get('OCRExitCode'))
+
     if result.get('IsErroredOnProcessing'):
-        raise Exception(result.get('ErrorMessage', 'Error en OCR'))
+        err_msg = result.get('ErrorMessage') or result.get('ErrorDetails') or 'Error en OCR'
+        if isinstance(err_msg, list):
+            err_msg = ' | '.join(err_msg)
+        raise Exception(err_msg)
     parsed = result.get('ParsedResults', [])
     if not parsed:
         return ''
-    return parsed[0].get('ParsedText', '')
+    texto = parsed[0].get('ParsedText', '')
+    logger.info('OCR.space texto extraído (%d chars): %s', len(texto), texto[:120])
+    return texto
 
 
 def _limpiar_monto(s):
