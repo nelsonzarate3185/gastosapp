@@ -1152,16 +1152,17 @@ def _extract_spreadsheet_id(url_or_id: str) -> str | None:
 
 def _escribir_hoja_gastos(sh, ws_name, qs):
     import gspread
-    headers = ['Fecha', 'Timbrado', 'N° Factura', 'RUC', 'Proveedor',
+    headers = ['Usuario', 'Fecha', 'Timbrado', 'N° Factura', 'RUC', 'Proveedor',
                'Tipo', 'Importe (Gs.)', 'IVA (Gs.)', 'Estado', 'Notas']
     try:
         ws = sh.worksheet(ws_name)
         ws.clear()
     except gspread.exceptions.WorksheetNotFound:
-        ws = sh.add_worksheet(title=ws_name, rows=max(qs.count() + 10, 50), cols=10)
+        ws = sh.add_worksheet(title=ws_name, rows=max(qs.count() + 10, 50), cols=11)
     rows = [headers]
     for f in qs:
         rows.append([
+            f.usuario.get_full_name() or f.usuario.username if f.usuario else '',
             f.fecha_emision.strftime('%d/%m/%Y') if f.fecha_emision else '',
             f.timbrado or '',
             f.numero_factura or '',
@@ -1178,15 +1179,16 @@ def _escribir_hoja_gastos(sh, ws_name, qs):
 
 def _escribir_hoja_ingresos(sh, ws_name, qs):
     import gspread
-    headers = ['Fecha', 'Descripción', 'Categoría', 'Monto (Gs.)', 'Notas']
+    headers = ['Usuario', 'Fecha', 'Descripción', 'Categoría', 'Monto (Gs.)', 'Notas']
     try:
         ws = sh.worksheet(ws_name)
         ws.clear()
     except gspread.exceptions.WorksheetNotFound:
-        ws = sh.add_worksheet(title=ws_name, rows=max(qs.count() + 10, 50), cols=5)
+        ws = sh.add_worksheet(title=ws_name, rows=max(qs.count() + 10, 50), cols=6)
     rows = [headers]
     for i in qs:
         rows.append([
+            i.usuario.get_full_name() or i.usuario.username if i.usuario else '',
             i.fecha.strftime('%d/%m/%Y') if i.fecha else '',
             i.descripcion,
             i.get_categoria_display(),
@@ -1215,8 +1217,8 @@ def _sincronizar_datos(user, config_obj):
 
     hojas_escritas = []
 
-    factura_qs_base = Factura.objects.filter(usuario__in=usuarios, fecha_emision__isnull=False)
-    ingreso_qs_base = Ingreso.objects.filter(usuario__in=usuarios)
+    factura_qs_base = Factura.objects.filter(usuario__in=usuarios, fecha_emision__isnull=False).select_related('usuario')
+    ingreso_qs_base = Ingreso.objects.filter(usuario__in=usuarios).select_related('usuario')
 
     # ── Hojas consolidadas por año ────────────────────────────────
     for year in sorted(set(factura_qs_base.values_list('fecha_emision__year', flat=True)), reverse=True):
@@ -1239,7 +1241,7 @@ def _sincronizar_datos(user, config_obj):
             Factura.objects.filter(usuario=u, fecha_emision__isnull=False)
             .values_list('fecha_emision__year', flat=True)
         ), reverse=True):
-            qs = Factura.objects.filter(usuario=u, fecha_emision__year=year).order_by('fecha_emision', 'nombre_proveedor')
+            qs = Factura.objects.filter(usuario=u, fecha_emision__year=year).select_related('usuario').order_by('fecha_emision', 'nombre_proveedor')
             ws_name = f'Gastos {year} {uname}'
             _escribir_hoja_gastos(sh, ws_name, qs)
             hojas_escritas.append(ws_name)
@@ -1248,7 +1250,7 @@ def _sincronizar_datos(user, config_obj):
             Ingreso.objects.filter(usuario=u)
             .values_list('fecha__year', flat=True)
         ), reverse=True):
-            qs = Ingreso.objects.filter(usuario=u, fecha__year=year).order_by('fecha', 'descripcion')
+            qs = Ingreso.objects.filter(usuario=u, fecha__year=year).select_related('usuario').order_by('fecha', 'descripcion')
             ws_name = f'Ingresos {year} {uname}'
             _escribir_hoja_ingresos(sh, ws_name, qs)
             hojas_escritas.append(ws_name)
