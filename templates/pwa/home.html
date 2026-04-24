@@ -918,40 +918,40 @@ function abrirCargaManual() {
 // LLENAR FORM OCR
 // ══════════════════════════════════════
 function llenarFormularioOCR(datos) {
-    setCampo('f_proveedor', 'tag_proveedor', datos.nombre_proveedor);
-    setCampo('f_ruc',       'tag_ruc',       datos.ruc);
-    setCampo('f_timbrado',  'tag_timbrado',  datos.timbrado);
-    setCampoNum('f_importe', 'tag_importe',  datos.importe_total);
-    setFecha('f_fecha',     'tag_fecha',     datos.fecha_emision);
-    // Impuesto no viene del OCR, se limpia
-    document.getElementById('f_impuesto').value = '';
+    setCampo('f_proveedor',     'tag_proveedor', datos.nombre_proveedor);
+    setCampo('f_ruc',           'tag_ruc',       datos.ruc);
+    setCampo('f_timbrado',      'tag_timbrado',  datos.timbrado);
+    setCampo('f_numero_factura', null,           datos.numero_factura);
+    setCampoNum('f_importe',    'tag_importe',   datos.importe_total);
+    setCampoNum('f_impuesto',    null,           datos.importe_impuesto);
+    setFecha('f_fecha',         'tag_fecha',     datos.fecha_emision);
 }
 
 function setCampo(inputId, tagId, valor) {
     const el = document.getElementById(inputId);
-    const tag = document.getElementById(tagId);
+    const tag = tagId ? document.getElementById(tagId) : null;
     if (valor && valor.toString().trim()) {
-        el.value = valor; el.classList.add('ocr-filled'); tag.style.display = 'inline';
+        el.value = valor; el.classList.add('ocr-filled'); if (tag) tag.style.display = 'inline';
     } else {
-        el.value = ''; el.classList.remove('ocr-filled'); tag.style.display = 'none';
+        el.value = ''; el.classList.remove('ocr-filled'); if (tag) tag.style.display = 'none';
     }
 }
 function setCampoNum(inputId, tagId, valor) {
     const el = document.getElementById(inputId);
-    const tag = document.getElementById(tagId);
+    const tag = tagId ? document.getElementById(tagId) : null;
     if (valor !== null && valor !== undefined && valor !== '') {
-        el.value = valor; el.classList.add('ocr-filled'); tag.style.display = 'inline';
+        el.value = valor; el.classList.add('ocr-filled'); if (tag) tag.style.display = 'inline';
     } else {
-        el.value = ''; el.classList.remove('ocr-filled'); tag.style.display = 'none';
+        el.value = ''; el.classList.remove('ocr-filled'); if (tag) tag.style.display = 'none';
     }
 }
 function setFecha(inputId, tagId, valor) {
     const el = document.getElementById(inputId);
-    const tag = document.getElementById(tagId);
+    const tag = tagId ? document.getElementById(tagId) : null;
     if (valor) {
-        el.value = valor; el.classList.add('ocr-filled'); tag.style.display = 'inline';
+        el.value = valor; el.classList.add('ocr-filled'); if (tag) tag.style.display = 'inline';
     } else {
-        el.value = ''; el.classList.remove('ocr-filled'); tag.style.display = 'none';
+        el.value = ''; el.classList.remove('ocr-filled'); if (tag) tag.style.display = 'none';
     }
 }
 

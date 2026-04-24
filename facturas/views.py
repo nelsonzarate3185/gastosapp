@@ -387,15 +387,19 @@ class FacturaUploadView(APIView):
         # ── 2. OCR ───────────────────────────────────────────────
         texto, fuente, aviso = '', 'api', ''
         try:
-            imagen.seek(0)
-            texto = ocr_con_api(imagen)
+            imagen_proc.seek(0)
+            texto = ocr_con_api(('factura.png', imagen_proc, 'image/png'))
         except Exception:
             try:
+                imagen_proc.seek(0)
                 texto = ocr_con_tesseract(imagen_proc)
                 fuente = 'tesseract'
             except Exception:
                 fuente = 'ninguno'
                 aviso = 'OCR no disponible. Podés completar los datos manualmente.'
+
+        if not texto.strip() and fuente != 'ninguno':
+            aviso = 'OCR no pudo leer texto de la imagen. Revisá que la foto sea clara y completá los datos manualmente.'
 
         # ── 3. Extracción ─────────────────────────────────────────
         datos = extraer_datos_ocr(texto)
