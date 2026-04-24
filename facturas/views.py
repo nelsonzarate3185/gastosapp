@@ -39,6 +39,7 @@ from openpyxl.utils import get_column_letter
 
 def ocr_con_api(imagen):
     api_key = settings.OCR_API_KEY
+    ssl_verify = getattr(settings, 'SSL_VERIFY', True)
     try:
         response = requests.post(
             'https://api.ocr.space/parse/image',
@@ -47,8 +48,12 @@ def ocr_con_api(imagen):
                 'apikey': api_key,
                 'language': 'spa',
                 'isOverlayRequired': False,
+                'scale': True,
+                'detectOrientation': True,
+                'OCREngine': 2,
             },
             timeout=30,
+            verify=ssl_verify,
         )
     except requests.exceptions.Timeout:
         raise Exception('El servicio OCR tardó demasiado. Intentá de nuevo.')
@@ -343,23 +348,33 @@ def _parsear_respuesta_ia(respuesta):
     return datos_ia
 
 
+def _anthropic_client():
+    """Crea un cliente Anthropic respetando el setting SSL_VERIFY."""
+    import anthropic, httpx
+    api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
+    ssl_verify = getattr(settings, 'SSL_VERIFY', True)
+    return anthropic.Anthropic(
+        api_key=api_key,
+        http_client=httpx.Client(verify=ssl_verify),
+    )
+
+
 def extraer_con_ia(texto_ocr):
     """Claude interpreta el texto OCR y devuelve campos estructurados."""
-    import anthropic
-
     api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
     if not api_key or not texto_ocr.strip():
         return {}
 
     try:
-        client = anthropic.Anthropic(api_key=api_key)
+        client = _anthropic_client()
         msg = client.messages.create(
             model='claude-haiku-4-5-20251001',
             max_tokens=512,
             messages=[{'role': 'user', 'content': _PROMPT_OCR.format(texto=texto_ocr[:3000])}],
         )
         return _parsear_respuesta_ia(msg.content[0].text.strip())
-    except Exception:
+    except Exception as exc:
+        logger.error('Error en extracción IA (texto): %s', exc)
         return {}
 
 
@@ -388,7 +403,7 @@ Respondé SOLO con JSON válido, sin texto adicional:
 
 def extraer_con_ia_vision(imagen_buf):
     """Claude lee la imagen directamente (Vision) cuando el OCR no extrajo texto."""
-    import anthropic, base64
+    import base64
     from PIL import Image as PILImage
 
     api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
@@ -400,9 +415,7 @@ def extraer_con_ia_vision(imagen_buf):
         # Convertir a JPEG RGB para reducir tamaño y maximizar compatibilidad
         imagen_buf.seek(0)
         img = PILImage.open(imagen_buf)
-        if img.mode not in ('RGB', 'L'):
-            img = img.convert('RGB')
-        elif img.mode == 'L':
+        if img.mode != 'RGB':
             img = img.convert('RGB')
         # Escalar si es muy grande (máx 1600px)
         w, h = img.size
@@ -414,7 +427,7 @@ def extraer_con_ia_vision(imagen_buf):
         buf_jpg.seek(0)
         image_data = base64.standard_b64encode(buf_jpg.read()).decode('utf-8')
 
-        client = anthropic.Anthropic(api_key=api_key)
+        client = _anthropic_client()
         msg = client.messages.create(
             model='claude-haiku-4-5-20251001',
             max_tokens=512,
@@ -437,6 +450,10 @@ def extraer_con_ia_vision(imagen_buf):
         logger.info('Vision IA extrajo: %s', resultado)
         return resultado
     except Exception as exc:
+        msg_exc = str(exc)
+        if 'credit balance' in msg_exc or 'too low' in msg_exc:
+            logger.warning('Anthropic sin créditos.')
+            raise Exception('Sin créditos en Anthropic.')
         logger.error('Error en Vision IA: %s', exc, exc_info=True)
         return {}
 
@@ -495,12 +512,17 @@ class FacturaUploadView(APIView):
         else:
             # Sin texto: Claude Vision lee la imagen directamente
             imagen_proc.seek(0)
-            datos_ia = extraer_con_ia_vision(imagen_proc)
-            if datos_ia and any(v for v in datos_ia.values() if v is not None):
-                fuente = 'ia_vision'
-                aviso = ''
-            elif fuente != 'ninguno':
-                aviso = 'No se pudo leer la imagen. Completá los datos manualmente.'
+            try:
+                datos_ia = extraer_con_ia_vision(imagen_proc)
+            except Exception as exc_vision:
+                datos_ia = {}
+                aviso = str(exc_vision) + ' Completá los datos manualmente.'
+            else:
+                if datos_ia and any(v for v in datos_ia.values() if v is not None):
+                    fuente = 'ia_vision'
+                    aviso = ''
+                elif fuente != 'ninguno':
+                    aviso = 'No se pudo leer la imagen. Completá los datos manualmente.'
 
         for campo, valor in datos_ia.items():
             if valor is not None and valor != '' and campo in datos:
