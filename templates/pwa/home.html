@@ -1005,7 +1005,8 @@ async function confirmarFactura() {
             window.location.reload();
         } else {
             const data = await res.json();
-            alert('Error al guardar: ' + JSON.stringify(data));
+            const msg = data.error || data.non_field_errors?.[0] || JSON.stringify(data);
+            alert('⚠️ ' + msg);
             document.getElementById('loadingConfirmar').style.display = 'none';
             document.querySelector('.btn-confirmar').disabled = false;
             document.querySelector('.btn-cancelar').disabled = false;
@@ -1279,7 +1280,8 @@ async function guardarEdicionFactura() {
             window.location.reload();
         } else {
             const data = await res.json();
-            alert('Error: ' + JSON.stringify(data));
+            const msg = data.error || data.non_field_errors?.[0] || JSON.stringify(data);
+            alert('⚠️ ' + msg);
             document.getElementById('loadingEditFactura').style.display = 'none';
             document.querySelectorAll('#modalEditFactura .btn-confirmar, #modalEditFactura .btn-cancelar')
                 .forEach(b => b.disabled = false);

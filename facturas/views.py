@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.db.models import Sum, Q
+from django.db import IntegrityError
 from django.utils import timezone
 from .models import Factura, Ingreso
 from .serializers import FacturaSerializer, IngresoSerializer, UsuarioSerializer
@@ -571,9 +572,32 @@ class FacturaConfirmarView(APIView):
         if not request.FILES.get('imagen'):
             data['carga_manual'] = True
 
+        # Verificar duplicado antes de guardar
+        ruc = (data.get('ruc') or '').strip()
+        timbrado = (data.get('timbrado') or '').strip()
+        numero_factura = (data.get('numero_factura') or '').strip()
+        usuario_id = data.get('usuario')
+        if ruc and timbrado and numero_factura and usuario_id:
+            if Factura.objects.filter(
+                usuario_id=usuario_id,
+                ruc=ruc,
+                timbrado=timbrado,
+                numero_factura=numero_factura,
+            ).exists():
+                return Response(
+                    {'error': f'Ya existe una factura cargada con RUC {ruc}, timbrado {timbrado} y número {numero_factura}.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         serializer = FacturaSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
+            try:
+                serializer.save()
+            except IntegrityError:
+                return Response(
+                    {'error': 'Ya existe una factura con el mismo RUC, timbrado y número de factura.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -610,9 +634,32 @@ class FacturaDetailView(APIView):
         factura = self._get_factura(pk, request.user)
         if not factura:
             return Response({'error': 'Factura no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Verificar duplicado excluyendo la factura actual
+        ruc = (request.data.get('ruc') or factura.ruc or '').strip()
+        timbrado = (request.data.get('timbrado') or factura.timbrado or '').strip()
+        numero_factura = (request.data.get('numero_factura') or factura.numero_factura or '').strip()
+        if ruc and timbrado and numero_factura:
+            if Factura.objects.filter(
+                usuario=factura.usuario,
+                ruc=ruc,
+                timbrado=timbrado,
+                numero_factura=numero_factura,
+            ).exclude(pk=pk).exists():
+                return Response(
+                    {'error': f'Ya existe una factura cargada con RUC {ruc}, timbrado {timbrado} y número {numero_factura}.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         serializer = FacturaSerializer(factura, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            try:
+                serializer.save()
+            except IntegrityError:
+                return Response(
+                    {'error': 'Ya existe una factura con el mismo RUC, timbrado y número de factura.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
