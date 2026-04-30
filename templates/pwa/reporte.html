@@ -910,6 +910,18 @@ async function sincronizarSheets() {
             const dt = new Date(d.ultima_sincronizacion);
             document.getElementById('sheetsUltimaSync').textContent =
                 '🕐 Última sincronización: ' + dt.toLocaleString('es-PY');
+        } else if (d.reconectar) {
+            mostrarResultadoSheets(
+                '⚠️ Tu sesión de Google expiró. ' +
+                '<a href="{% url "sheets-conectar" %}" style="color:#c5221f;font-weight:700;text-decoration:underline;">' +
+                'Volvé a conectar tu cuenta</a> para continuar sincronizando.',
+                false
+            );
+            // Actualizar badge a desconectado y mostrar panel de reconexión
+            document.getElementById('sheetsBadge').textContent = 'Reconectar';
+            document.getElementById('sheetsBadge').className = 'sheets-badge desconectado';
+            document.getElementById('sheetsConectado').style.display = 'none';
+            document.getElementById('sheetsNoConectado').style.display = 'block';
         } else {
             mostrarResultadoSheets('❌ ' + (d.error || 'Error al sincronizar.'), false);
         }

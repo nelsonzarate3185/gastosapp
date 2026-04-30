@@ -1488,10 +1488,15 @@ def _build_flow():
     return flow
 
 
+class TokenExpiradoError(Exception):
+    """El refresh token de Google fue revocado o expiró — el usuario debe reconectar."""
+
+
 def _get_gspread_client(config_obj):
     """Devuelve un cliente gspread autenticado, refrescando token si es necesario."""
     from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request, AuthorizedSession
+    from google.auth.exceptions import RefreshError
     import gspread
 
     creds = Credentials(
@@ -1504,7 +1509,20 @@ def _get_gspread_client(config_obj):
     )
 
     if not creds.valid and creds.refresh_token:
-        creds.refresh(Request())
+        try:
+            creds.refresh(Request())
+        except RefreshError as exc:
+            # Token revocado o expirado — limpiar credenciales y pedir reconexión
+            logger.warning('Google refresh token inválido para usuario %s: %s', config_obj.usuario_id, exc)
+            config_obj.access_token = ''
+            config_obj.refresh_token = ''
+            config_obj.token_expiry = None
+            config_obj.save(update_fields=['access_token', 'refresh_token', 'token_expiry'])
+            raise TokenExpiradoError(
+                'La sesión de Google expiró o fue revocada. '
+                'Desconectá y volvé a conectar tu cuenta de Google.'
+            ) from exc
+
         config_obj.access_token = creds.token
         if creds.expiry:
             from datetime import timezone as _tz
@@ -1812,6 +1830,11 @@ class SheetsSincronizarView(APIView):
                 'total_ingresos': resultado['total_ingresos'],
                 'ultima_sincronizacion': cfg.ultima_sincronizacion.isoformat(),
             })
+        except TokenExpiradoError as e:
+            return Response(
+                {'error': str(e), 'reconectar': True},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
         except Exception as e:
             return Response(
                 {'error': f'Error al sincronizar: {e}'},
