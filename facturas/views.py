@@ -13,8 +13,14 @@ from django.contrib import messages
 from django.db.models import Sum, Q
 from django.db import IntegrityError
 from django.utils import timezone
-from .models import Factura, Ingreso
-from .serializers import FacturaSerializer, IngresoSerializer, UsuarioSerializer
+from datetime import timedelta
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+from .models import Factura, Ingreso, UserRole, ContadorUsuario
+from .serializers import (
+    FacturaSerializer, IngresoSerializer, UsuarioSerializer,
+    ContadorUsuarioListSerializer, ContadorUsuarioDetailSerializer,
+    ContadorUsuarioCreateSerializer, ContadorFacturaSerializer, ContadorIngresoSerializer,
+)
 import requests
 import re
 import csv
@@ -22,6 +28,7 @@ import io
 import logging
 from django.http import HttpResponse
 from django.db.models.functions import TruncMonth
+from django.db import models as django_models
 
 logger = logging.getLogger(__name__)
 
@@ -1932,4 +1939,287 @@ class ReporteDashboardView(APIView):
                 'balance_anio':  total_ing - total_egr,
             },
         })
+
+
+# ══════════════════════════════════════════════════════
+# CONTADOR — Helpers y vistas API
+# ══════════════════════════════════════════════════════
+
+def _es_contador(user):
+    try:
+        return UserRole.objects.get(user=user).role == 'contador'
+    except UserRole.DoesNotExist:
+        return False
+
+
+def _obtener_usuario_del_contador(contador, usuario_id):
+    """Devuelve el User si pertenece al contador, None si no."""
+    try:
+        rel = ContadorUsuario.objects.get(
+            contador=contador, usuario_normal_id=usuario_id, activo=True
+        )
+        return rel.usuario_normal
+    except ContadorUsuario.DoesNotExist:
+        return None
+
+
+class ContadorUsuariosListCreateView(APIView):
+    """GET: listar mis usuarios | POST: crear/vincular usuario."""
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado'}, status=401)
+        if not _es_contador(request.user):
+            return Response({'error': 'Acceso solo para contadores'}, status=403)
+        qs = ContadorUsuario.objects.filter(contador=request.user).select_related('usuario_normal')
+        return Response(ContadorUsuarioListSerializer(qs, many=True).data)
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado'}, status=401)
+        if not _es_contador(request.user):
+            return Response({'error': 'Acceso solo para contadores'}, status=403)
+
+        ser = ContadorUsuarioCreateSerializer(data=request.data)
+        if not ser.is_valid():
+            return Response(ser.errors, status=400)
+
+        data = ser.validated_data
+        email = data['email']
+        username = data.get('username') or email.split('@')[0]
+
+        usuario, _ = User.objects.get_or_create(
+            email=email,
+            defaults={
+                'username': username,
+                'first_name': data.get('first_name', ''),
+                'last_name': data.get('last_name', ''),
+            }
+        )
+
+        rel, created = ContadorUsuario.objects.update_or_create(
+            usuario_normal=usuario,
+            defaults={
+                'contador': request.user,
+                'ruc_usuario': data.get('ruc_usuario', ''),
+                'nombre_razon_social': data.get('nombre_razon_social', ''),
+                'direccion': data.get('direccion', ''),
+                'telefono': data.get('telefono', ''),
+                'email': email,
+                'puede_crear_facturas': data.get('puede_crear_facturas', True),
+                'puede_crear_ingresos': data.get('puede_crear_ingresos', True),
+                'puede_editar_transacciones': data.get('puede_editar_transacciones', True),
+                'puede_ver_reportes': data.get('puede_ver_reportes', True),
+                'activo': True,
+            }
+        )
+        return Response(
+            ContadorUsuarioDetailSerializer(rel).data,
+            status=201 if created else 200,
+        )
+
+
+class ContadorUsuariosDetailView(APIView):
+    """GET/PATCH/DELETE un usuario del contador."""
+
+    def _get_relacion(self, request, pk):
+        try:
+            return ContadorUsuario.objects.get(usuario_normal_id=pk, contador=request.user)
+        except ContadorUsuario.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado'}, status=401)
+        rel = self._get_relacion(request, pk)
+        if not rel:
+            return Response({'error': 'No tienes acceso'}, status=404)
+        return Response(ContadorUsuarioDetailSerializer(rel).data)
+
+    def patch(self, request, pk):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado'}, status=401)
+        rel = self._get_relacion(request, pk)
+        if not rel:
+            return Response({'error': 'No tienes acceso'}, status=404)
+        campos = [
+            'ruc_usuario', 'nombre_razon_social', 'direccion', 'telefono', 'email',
+            'puede_crear_facturas', 'puede_crear_ingresos',
+            'puede_editar_transacciones', 'puede_ver_reportes',
+        ]
+        for campo in campos:
+            if campo in request.data:
+                setattr(rel, campo, request.data[campo])
+        rel.save()
+        return Response(ContadorUsuarioDetailSerializer(rel).data)
+
+    def delete(self, request, pk):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado'}, status=401)
+        rel = self._get_relacion(request, pk)
+        if not rel:
+            return Response({'error': 'No tienes acceso'}, status=404)
+        rel.delete()
+        return Response(status=204)
+
+
+class ContadorUsuariosBloquearView(APIView):
+    """PATCH: bloquear o reactivar un usuario."""
+
+    def patch(self, request, pk):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado'}, status=401)
+        try:
+            rel = ContadorUsuario.objects.get(usuario_normal_id=pk, contador=request.user)
+        except ContadorUsuario.DoesNotExist:
+            return Response({'error': 'No tienes acceso'}, status=404)
+
+        activo = request.data.get('activo')
+        if activo is False or activo == 'false':
+            rel.activo = False
+            rel.fecha_bloqueo = timezone.now()
+            rel.razon_bloqueo = request.data.get('razon_bloqueo', '')
+        else:
+            rel.activo = True
+            rel.fecha_bloqueo = None
+            rel.razon_bloqueo = ''
+        rel.save()
+        return Response(ContadorUsuarioDetailSerializer(rel).data)
+
+
+class ContadorFacturasCreateView(APIView):
+    """POST: crear factura propia o para un usuario gestionado."""
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado'}, status=401)
+
+        usuario_id = request.data.get('usuario_id')
+        if usuario_id:
+            if not _es_contador(request.user):
+                return Response({'error': 'No eres contador'}, status=403)
+            usuario = _obtener_usuario_del_contador(request.user, usuario_id)
+            if not usuario:
+                return Response({'error': 'No tienes acceso a ese usuario'}, status=403)
+        else:
+            usuario = request.user
+
+        data = request.data.copy()
+        data['usuario'] = usuario.id
+        ser = ContadorFacturaSerializer(data=data)
+        if ser.is_valid():
+            factura = ser.save(usuario=usuario, registrado_por=request.user)
+            return Response(ContadorFacturaSerializer(factura).data, status=201)
+        return Response(ser.errors, status=400)
+
+
+class ContadorIngresosCreateView(APIView):
+    """POST: crear ingreso propio o para un usuario gestionado."""
+
+    def post(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado'}, status=401)
+
+        usuario_id = request.data.get('usuario_id')
+        if usuario_id:
+            if not _es_contador(request.user):
+                return Response({'error': 'No eres contador'}, status=403)
+            usuario = _obtener_usuario_del_contador(request.user, usuario_id)
+            if not usuario:
+                return Response({'error': 'No tienes acceso a ese usuario'}, status=403)
+        else:
+            usuario = request.user
+
+        data = request.data.copy()
+        data['usuario'] = usuario.id
+        ser = ContadorIngresoSerializer(data=data)
+        if ser.is_valid():
+            ingreso = ser.save(usuario=usuario, registrado_por=request.user)
+            return Response(ContadorIngresoSerializer(ingreso).data, status=201)
+        return Response(ser.errors, status=400)
+
+
+class ContadorTransaccionesListView(APIView):
+    """GET: listar facturas o ingresos de un usuario gestionado."""
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado'}, status=401)
+
+        usuario_id = request.query_params.get('usuario_id')
+        tipo = request.query_params.get('tipo', 'factura')
+
+        if usuario_id:
+            if not _es_contador(request.user):
+                return Response({'error': 'No eres contador'}, status=403)
+            usuario = _obtener_usuario_del_contador(request.user, usuario_id)
+            if not usuario:
+                return Response({'error': 'No tienes acceso'}, status=403)
+        else:
+            usuario = request.user
+
+        if tipo == 'ingreso':
+            qs = Ingreso.objects.filter(usuario=usuario).order_by('-creado')
+            paginator = Paginator(qs, 50)
+            page_obj = paginator.get_page(request.query_params.get('page', 1))
+            ser = ContadorIngresoSerializer(page_obj.object_list, many=True)
+        else:
+            qs = Factura.objects.filter(usuario=usuario).order_by('-creado')
+            paginator = Paginator(qs, 50)
+            page_obj = paginator.get_page(request.query_params.get('page', 1))
+            ser = ContadorFacturaSerializer(page_obj.object_list, many=True)
+
+        return Response({
+            'count': paginator.count,
+            'next': page_obj.next_page_number() if page_obj.has_next() else None,
+            'previous': page_obj.previous_page_number() if page_obj.has_previous() else None,
+            'results': ser.data,
+        })
+
+
+class ContadorDashboardView(APIView):
+    """GET: datos del dashboard del contador."""
+
+    def get(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'No autenticado'}, status=401)
+        if not _es_contador(request.user):
+            return Response({'error': 'Acceso solo para contadores'}, status=403)
+
+        total_usuarios = ContadorUsuario.objects.filter(contador=request.user, activo=True).count()
+        usuarios_bloqueados = ContadorUsuario.objects.filter(contador=request.user, activo=False).count()
+
+        una_semana = timezone.now() - timedelta(days=7)
+        transacciones_semana = (
+            Factura.objects.filter(registrado_por=request.user, creado__gte=una_semana).count() +
+            Ingreso.objects.filter(registrado_por=request.user, creado__gte=una_semana).count()
+        )
+
+        mis_usuarios_ids = ContadorUsuario.objects.filter(
+            contador=request.user, activo=True
+        ).values_list('usuario_normal_id', flat=True)
+
+        facturas_total = Factura.objects.filter(
+            usuario_id__in=mis_usuarios_ids
+        ).aggregate(t=django_models.Sum('importe_total'))['t'] or 0
+
+        ingresos_total = Ingreso.objects.filter(
+            usuario_id__in=mis_usuarios_ids
+        ).aggregate(t=django_models.Sum('monto'))['t'] or 0
+
+        return Response({
+            'total_usuarios': total_usuarios,
+            'usuarios_bloqueados': usuarios_bloqueados,
+            'transacciones_semana': transacciones_semana,
+            'balance_total': float(ingresos_total) - float(facturas_total),
+        })
+
+
+# ── Vistas HTML del contador ─────────────────────────────────────────────────
+
+@login_required
+def contador_dashboard_view(request):
+    return render(request, 'pwa/contador-dashboard.html', {
+        'usuario': request.user,
+    })
 

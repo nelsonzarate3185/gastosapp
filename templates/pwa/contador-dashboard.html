@@ -1,0 +1,1240 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>Dashboard Contador - GastosApp</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-radius: 0 0 10px 10px;
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-title h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        
+        .header-title p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .user-info {
+            text-align: right;
+        }
+        
+        .user-info span {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        nav {
+            background: white;
+            padding: 15px 20px;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        nav a {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-right: 10px;
+            text-decoration: none;
+            color: #667eea;
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        nav a:hover,
+        nav a.active {
+            color: #764ba2;
+            border-bottom-color: #764ba2;
+            background: #f9f9f9;
+        }
+        
+        .tabs {
+            display: none;
+        }
+        
+        .tabs.active {
+            display: block;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            transition: box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+        }
+        
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #667eea;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+        
+        .resumen-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .resumen-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .resumen-item.secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .resumen-item.success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .resumen-item.warning {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+        
+        .resumen-item-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .resumen-item-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        thead {
+            background: #f9f9f9;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        tbody tr:hover {
+            background: #f9f9f9;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-activo {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-inactivo {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge-bloqueado {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #764ba2;
+        }
+        
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+        
+        .btn-danger {
+            background: #f5576c;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #d63447;
+        }
+        
+        .btn-block {
+            width: 100%;
+            display: block;
+            margin-top: 15px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 20px;
+        }
+        
+        .pagination a,
+        .pagination span {
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            text-decoration: none;
+            color: #667eea;
+        }
+        
+        .pagination a:hover,
+        .pagination a.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .modal-header h3 {
+            color: #667eea;
+        }
+        
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #667eea;
+            font-size: 14px;
+        }
+        
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-box {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-box-label {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+        
+        .stat-box-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+            }
+            
+            nav a {
+                display: block;
+                margin-bottom: 5px;
+            }
+            
+            table {
+                font-size: 12px;
+            }
+            
+            th, td {
+                padding: 8px;
+            }
+            
+            .resumen-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="header-title">
+                <h1>📊 Dashboard Contador</h1>
+                <p>Gestión de usuarios y transacciones</p>
+            </div>
+            <div class="user-info">
+                <span><strong id="current-user">{{ usuario.get_full_name|default:usuario.username }}</strong></span>
+                <span>Contador Activo</span>
+                <a href="/logout/" style="color: white; text-decoration: underline; font-size: 12px;">Cerrar Sesión</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- NAVEGACIÓN -->
+        <nav>
+            <a href="#tab-dashboard" class="nav-link active" onclick="showTab('dashboard')">📈 Dashboard</a>
+            <a href="#tab-usuarios" class="nav-link" onclick="showTab('usuarios')">👥 Mis Usuarios</a>
+            <a href="#tab-registrar" class="nav-link" onclick="showTab('registrar')">➕ Registrar</a>
+            <a href="#tab-movimientos" class="nav-link" onclick="showTab('movimientos')">📋 Movimientos</a>
+            <a href="#tab-reportes" class="nav-link" onclick="showTab('reportes')">📊 Reportes</a>
+        </nav>
+
+        <!-- TAB 1: DASHBOARD -->
+        <div id="tab-dashboard" class="tabs active">
+            <div class="card">
+                <h2>📊 Resumen Rápido</h2>
+                <div class="resumen-grid">
+                    <div class="resumen-item">
+                        <div class="resumen-item-label">Mis Usuarios</div>
+                        <div class="resumen-item-value" id="total-usuarios">3</div>
+                    </div>
+                    <div class="resumen-item secondary">
+                        <div class="resumen-item-label">Transacciones Semana</div>
+                        <div class="resumen-item-value" id="transacciones-semana">12</div>
+                    </div>
+                    <div class="resumen-item success">
+                        <div class="resumen-item-label">Balance Total</div>
+                        <div class="resumen-item-value" id="balance-total">1.25M</div>
+                    </div>
+                    <div class="resumen-item warning">
+                        <div class="resumen-item-label">Usuarios Bloqueados</div>
+                        <div class="resumen-item-value" id="usuarios-bloqueados">1</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📈 Gráfico: Transacciones Este Mes</h2>
+                <div class="chart-container">
+                    <canvas id="chart-transacciones"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>👥 Últimos Usuarios Agregados</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Email</th>
+                            <th>Estado</th>
+                            <th>Creado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-usuarios-dashboard">
+                        <tr>
+                            <td>Juan García</td>
+                            <td>juan@example.com</td>
+                            <td><span class="badge badge-activo">✓ Activo</span></td>
+                            <td>2024-06-10</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-primary" onclick="showTab('usuarios')">Ver</button>
+                                    <button class="btn btn-secondary" onclick="alert('Editar')">Editar</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Carlos López</td>
+                            <td>carlos@example.com</td>
+                            <td><span class="badge badge-activo">✓ Activo</span></td>
+                            <td>2024-06-05</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-primary" onclick="showTab('usuarios')">Ver</button>
+                                    <button class="btn btn-secondary" onclick="alert('Editar')">Editar</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Pedro Martínez</td>
+                            <td>pedro@example.com</td>
+                            <td><span class="badge badge-bloqueado">⛔ Bloqueado</span></td>
+                            <td>2024-05-20</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-primary" onclick="showTab('usuarios')">Ver</button>
+                                    <button class="btn btn-secondary" onclick="alert('Editar')">Editar</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 2: MIS USUARIOS -->
+        <div id="tab-usuarios" class="tabs">
+            <div class="card">
+                <h2>👥 Gestión de Usuarios</h2>
+                <button class="btn btn-primary btn-block" onclick="mostrarFormularioCrear()">➕ Agregar Nuevo Usuario</button>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Email</th>
+                            <th>RUC</th>
+                            <th>Facturas</th>
+                            <th>Ingresos</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-usuarios">
+                        <tr>
+                            <td>Juan García</td>
+                            <td>juan@example.com</td>
+                            <td>12345678</td>
+                            <td>15</td>
+                            <td>8</td>
+                            <td><span class="badge badge-activo">✓ Activo</span></td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-primary" onclick="mostrarDetallesUsuario(1)">👁️</button>
+                                    <button class="btn btn-secondary" onclick="mostrarFormularioEditar(1)">✏️</button>
+                                    <button class="btn btn-danger" onclick="bloquearUsuario(1)">🚫</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Carlos López</td>
+                            <td>carlos@example.com</td>
+                            <td>87654321</td>
+                            <td>10</td>
+                            <td>5</td>
+                            <td><span class="badge badge-activo">✓ Activo</span></td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-primary" onclick="mostrarDetallesUsuario(2)">👁️</button>
+                                    <button class="btn btn-secondary" onclick="mostrarFormularioEditar(2)">✏️</button>
+                                    <button class="btn btn-danger" onclick="bloquearUsuario(2)">🚫</button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Pedro Martínez</td>
+                            <td>pedro@example.com</td>
+                            <td>55555555</td>
+                            <td>22</td>
+                            <td>10</td>
+                            <td><span class="badge badge-bloqueado">⛔ Bloqueado</span></td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-primary" onclick="mostrarDetallesUsuario(3)">👁️</button>
+                                    <button class="btn btn-secondary" onclick="mostrarFormularioEditar(3)">✏️</button>
+                                    <button class="btn btn-secondary" onclick="reactivarUsuario(3)">✅</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 3: REGISTRAR TRANSACCIÓN -->
+        <div id="tab-registrar" class="tabs">
+            <div class="card">
+                <h2>➕ Registrar Nueva Transacción</h2>
+                
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-primary" style="margin-right: 10px;" onclick="mostrarFormularioFactura()">📄 Registrar Factura</button>
+                    <button class="btn btn-secondary" onclick="mostrarFormularioIngreso()">💰 Registrar Ingreso</button>
+                </div>
+
+                <!-- FORMULARIO FACTURA -->
+                <div id="formulario-factura" style="display: none;">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">Registrar Nueva Factura</h3>
+                    
+                    <div class="form-group">
+                        <label>¿Para qué usuario?</label>
+                        <select>
+                            <option value="">-- Para mí (Mi cuenta) --</option>
+                            <option value="1">Juan García</option>
+                            <option value="2">Carlos López</option>
+                            <option value="3">Pedro Martínez</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" value="2024-07-12">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Nombre del Proveedor</label>
+                        <input type="text" placeholder="Ej: Tienda XYZ">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Descripción</label>
+                        <textarea rows="3" placeholder="Detalles de la compra..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Monto</label>
+                        <input type="number" placeholder="50000" step="100">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Categoría</label>
+                        <select>
+                            <option>Gastos Generales</option>
+                            <option>Suministros</option>
+                            <option>Servicios</option>
+                            <option>Otros</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select>
+                            <option>Pendiente</option>
+                            <option>Pagada</option>
+                            <option>Vencida</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-primary btn-block" onclick="guardarFactura()">💾 Guardar Factura</button>
+                    <button class="btn btn-secondary btn-block" onclick="ocultarFormularios()">Cancelar</button>
+                </div>
+
+                <!-- FORMULARIO INGRESO -->
+                <div id="formulario-ingreso" style="display: none;">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">Registrar Nuevo Ingreso</h3>
+                    
+                    <div class="form-group">
+                        <label>¿Para qué usuario?</label>
+                        <select>
+                            <option value="">-- Para mí (Mi cuenta) --</option>
+                            <option value="1">Juan García</option>
+                            <option value="2">Carlos López</option>
+                            <option value="3">Pedro Martínez</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" value="2024-07-12">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Descripción</label>
+                        <input type="text" placeholder="Ej: Sueldo, Venta, Transferencia...">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Monto</label>
+                        <input type="number" placeholder="200000" step="100">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Categoría</label>
+                        <select>
+                            <option>Sueldo</option>
+                            <option>Freelance</option>
+                            <option>Venta</option>
+                            <option>Alquiler</option>
+                            <option>Transferencia</option>
+                            <option>Otro</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Notas (opcional)</label>
+                        <textarea rows="3" placeholder="Detalles adicionales..."></textarea>
+                    </div>
+
+                    <button class="btn btn-primary btn-block" onclick="guardarIngreso()">💾 Guardar Ingreso</button>
+                    <button class="btn btn-secondary btn-block" onclick="ocultarFormularios()">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: MIS MOVIMIENTOS -->
+        <div id="tab-movimientos" class="tabs">
+            <div class="card">
+                <h2>📋 Mis Movimientos (Mío + Usuarios)</h2>
+                
+                <div style="margin-bottom: 15px; display: grid; grid-template-columns: auto auto auto auto; gap: 10px;">
+                    <select id="filtro-tipo">
+                        <option value="">Todos</option>
+                        <option value="factura">Facturas</option>
+                        <option value="ingreso">Ingresos</option>
+                    </select>
+                    <select id="filtro-usuario">
+                        <option value="">Todos mis movimientos</option>
+                        <option value="mio">Solo míos</option>
+                        <option value="1">Juan García</option>
+                        <option value="2">Carlos López</option>
+                        <option value="3">Pedro Martínez</option>
+                    </select>
+                    <select id="filtro-mes">
+                        <option value="2024-07">Julio 2024</option>
+                        <option value="2024-06">Junio 2024</option>
+                        <option value="2024-05">Mayo 2024</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="aplicarFiltros()">🔍 Filtrar</button>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-box">
+                        <div class="stat-box-label">Mis Facturas</div>
+                        <div class="stat-box-value">5 (50K)</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-label">Mis Ingresos</div>
+                        <div class="stat-box-value">3 (45K)</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-label">De Usuarios</div>
+                        <div class="stat-box-value">40 (950K)</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-label">Balance Total</div>
+                        <div class="stat-box-value">1.24M</div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Usuario</th>
+                            <th>Tipo</th>
+                            <th>Descripción</th>
+                            <th>Monto</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>12/07</td>
+                            <td><strong>Yo</strong></td>
+                            <td>📄 Factura</td>
+                            <td>Tienda XYZ</td>
+                            <td>50,000</td>
+                            <td><span class="badge badge-activo">Pendiente</span></td>
+                            <td><button class="btn btn-secondary" onclick="alert('Editar')">✏️</button></td>
+                        </tr>
+                        <tr>
+                            <td>12/07</td>
+                            <td><strong>Juan</strong></td>
+                            <td>📄 Factura</td>
+                            <td>Proveedor Z</td>
+                            <td>100,000</td>
+                            <td><span class="badge badge-activo">Pagada</span></td>
+                            <td><button class="btn btn-secondary" onclick="alert('Editar')">✏️</button></td>
+                        </tr>
+                        <tr>
+                            <td>11/07</td>
+                            <td><strong>Yo</strong></td>
+                            <td>💰 Ingreso</td>
+                            <td>Sueldo</td>
+                            <td>200,000</td>
+                            <td><span class="badge badge-activo">Registrado</span></td>
+                            <td><button class="btn btn-secondary" onclick="alert('Editar')">✏️</button></td>
+                        </tr>
+                        <tr>
+                            <td>11/07</td>
+                            <td><strong>Carlos</strong></td>
+                            <td>💰 Ingreso</td>
+                            <td>Venta</td>
+                            <td>75,000</td>
+                            <td><span class="badge badge-activo">Registrado</span></td>
+                            <td><button class="btn btn-secondary" onclick="alert('Editar')">✏️</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="pagination">
+                    <a href="#">←</a>
+                    <a href="#" class="active">1</a>
+                    <a href="#">2</a>
+                    <a href="#">3</a>
+                    <a href="#">→</a>
+                </div>
+
+                <button class="btn btn-primary btn-block" style="margin-top: 15px;" onclick="descargarExcel()">📊 Descargar Excel</button>
+            </div>
+        </div>
+
+        <!-- TAB 5: REPORTES -->
+        <div id="tab-reportes" class="tabs">
+            <div class="card">
+                <h2>📊 Reportes Consolidados</h2>
+
+                <div style="margin-bottom: 15px; display: grid; grid-template-columns: auto auto; gap: 10px;">
+                    <select id="filtro-reporte-mes">
+                        <option value="2024-07">Julio 2024</option>
+                        <option value="2024-06">Junio 2024</option>
+                        <option value="2024-05">Mayo 2024</option>
+                    </select>
+                    <select id="filtro-reporte-usuario">
+                        <option value="">Todos los usuarios</option>
+                        <option value="mio">Solo mis transacciones</option>
+                        <option value="1">Juan García</option>
+                        <option value="2">Carlos López</option>
+                        <option value="3">Pedro Martínez</option>
+                    </select>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-box">
+                        <div class="stat-box-label">Total Facturas</div>
+                        <div class="stat-box-value">30</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-label">Monto Facturas</div>
+                        <div class="stat-box-value">400K</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-label">Total Ingresos</div>
+                        <div class="stat-box-value">18</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-label">Monto Ingresos</div>
+                        <div class="stat-box-value">320K</div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="chart-reportes"></canvas>
+                </div>
+
+                <h3 style="color: #667eea; margin-top: 30px; margin-bottom: 15px;">📋 Detalle por Usuario</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Facturas (Cant)</th>
+                            <th>Monto Facturas</th>
+                            <th>Ingresos (Cant)</th>
+                            <th>Monto Ingresos</th>
+                            <th>Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Juan García</strong></td>
+                            <td>15</td>
+                            <td>100,000</td>
+                            <td>8</td>
+                            <td>75,000</td>
+                            <td style="color: #4facfe; font-weight: bold;">+25,000</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Carlos López</strong></td>
+                            <td>10</td>
+                            <td>50,000</td>
+                            <td>5</td>
+                            <td>50,000</td>
+                            <td style="color: #999; font-weight: bold;">0</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Pedro Martínez</strong></td>
+                            <td>22</td>
+                            <td>200,000</td>
+                            <td>10</td>
+                            <td>150,000</td>
+                            <td style="color: #4facfe; font-weight: bold;">+50,000</td>
+                        </tr>
+                        <tr style="background: #f9f9f9; font-weight: bold;">
+                            <td>TOTAL CONSOLIDADO</td>
+                            <td>47</td>
+                            <td>350,000</td>
+                            <td>23</td>
+                            <td>275,000</td>
+                            <td style="color: #4facfe;">+75,000</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="descargarReportePDF()">📄 Descargar PDF</button>
+                    <button class="btn btn-primary" onclick="descargarReporteExcel()">📊 Descargar Excel</button>
+                    <button class="btn btn-secondary" onclick="imprimirReporte()">🖨️ Imprimir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CREAR/EDITAR USUARIO -->
+    <div id="modal-usuario" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-titulo">Crear Nuevo Usuario</h3>
+                <button class="btn-close" onclick="cerrarModal('modal-usuario')">×</button>
+            </div>
+
+            <form>
+                <div class="form-group">
+                    <label>Nombre Completo</label>
+                    <input type="text" id="usuario-nombre" placeholder="Juan García">
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="usuario-email" placeholder="juan@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label>Nombre de Usuario</label>
+                    <input type="text" id="usuario-username" placeholder="juan_g">
+                </div>
+
+                <div class="form-group">
+                    <label>RUC (opcional)</label>
+                    <input type="text" id="usuario-ruc" placeholder="12345678">
+                </div>
+
+                <div class="form-group">
+                    <label>Razón Social (opcional)</label>
+                    <input type="text" id="usuario-razon-social" placeholder="Juan García SRL">
+                </div>
+
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <input type="text" id="usuario-direccion" placeholder="Calle Principal 123">
+                </div>
+
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="tel" id="usuario-telefono" placeholder="+595 981 234567">
+                </div>
+
+                <h4 style="color: #667eea; margin-top: 20px; margin-bottom: 10px;">Permisos</h4>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="perm-facturas" checked> Puede crear facturas
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="perm-ingresos" checked> Puede crear ingresos
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="perm-editar" checked> Puede editar transacciones
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="perm-reportes" checked> Puede ver reportes
+                    </label>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button type="button" class="btn btn-primary btn-block" onclick="guardarUsuario()">💾 Guardar Usuario</button>
+                    <button type="button" class="btn btn-secondary btn-block" onclick="cerrarModal('modal-usuario')" style="margin-top: 10px;">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALLES USUARIO -->
+    <div id="modal-detalles" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Detalles del Usuario</h3>
+                <button class="btn-close" onclick="cerrarModal('modal-detalles')">×</button>
+            </div>
+
+            <div id="detalles-contenido">
+                <!-- Será llenado dinámicamente -->
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button class="btn btn-primary btn-block" onclick="cerrarModal('modal-detalles')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+
+        // Funciones auxiliares
+        function showTab(tabName) {
+            // Ocultar todos los tabs
+            document.querySelectorAll('.tabs').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Mostrar el tab seleccionado
+            document.getElementById('tab-' + tabName).classList.add('active');
+            
+            // Actualizar navegación
+            document.querySelectorAll('nav a').forEach(link => {
+                link.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        function mostrarFormularioCrear() {
+            document.getElementById('modal-titulo').textContent = 'Crear Nuevo Usuario';
+            document.getElementById('usuario-nombre').value = '';
+            document.getElementById('usuario-email').value = '';
+            document.getElementById('usuario-username').value = '';
+            document.getElementById('usuario-ruc').value = '';
+            document.getElementById('usuario-razon-social').value = '';
+            document.getElementById('usuario-direccion').value = '';
+            document.getElementById('usuario-telefono').value = '';
+            abrirModal('modal-usuario');
+        }
+
+        function mostrarFormularioEditar(id) {
+            document.getElementById('modal-titulo').textContent = 'Editar Usuario';
+            // Aquí se cargarían los datos del usuario
+            abrirModal('modal-usuario');
+        }
+
+        function mostrarDetallesUsuario(id) {
+            const detalles = {
+                1: {
+                    nombre: 'Juan García',
+                    email: 'juan@example.com',
+                    usuario: 'juan_g',
+                    ruc: '12345678',
+                    razon: 'Juan García SRL',
+                    direccion: 'Calle Principal 123',
+                    telefono: '+595 981 234567',
+                    estado: 'Activo',
+                    creado: '2024-05-15',
+                    ultimo: '2024-07-12 15:30'
+                }
+            };
+            
+            const d = detalles[id] || detalles[1];
+            document.getElementById('detalles-contenido').innerHTML = `
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 8px;">
+                    <p><strong>Nombre:</strong> ${d.nombre}</p>
+                    <p><strong>Email:</strong> ${d.email}</p>
+                    <p><strong>Usuario:</strong> ${d.usuario}</p>
+                    <p><strong>RUC:</strong> ${d.ruc}</p>
+                    <p><strong>Razón Social:</strong> ${d.razon}</p>
+                    <p><strong>Dirección:</strong> ${d.direccion}</p>
+                    <p><strong>Teléfono:</strong> ${d.telefono}</p>
+                    <p><strong>Estado:</strong> <span class="badge badge-activo">${d.estado}</span></p>
+                    <p><strong>Creado:</strong> ${d.creado}</p>
+                    <p><strong>Último acceso:</strong> ${d.ultimo}</p>
+                </div>
+            `;
+            abrirModal('modal-detalles');
+        }
+
+        function bloquearUsuario(id) {
+            if (confirm('¿Estás seguro de que quieres bloquear este usuario?')) {
+                alert('Usuario bloqueado');
+            }
+        }
+
+        function reactivarUsuario(id) {
+            if (confirm('¿Reactivar este usuario?')) {
+                alert('Usuario reactivado');
+            }
+        }
+
+        function mostrarFormularioFactura() {
+            document.getElementById('formulario-factura').style.display = 'block';
+            document.getElementById('formulario-ingreso').style.display = 'none';
+        }
+
+        function mostrarFormularioIngreso() {
+            document.getElementById('formulario-factura').style.display = 'none';
+            document.getElementById('formulario-ingreso').style.display = 'block';
+        }
+
+        function ocultarFormularios() {
+            document.getElementById('formulario-factura').style.display = 'none';
+            document.getElementById('formulario-ingreso').style.display = 'none';
+        }
+
+        function guardarFactura() {
+            alert('Factura guardada');
+            ocultarFormularios();
+        }
+
+        function guardarIngreso() {
+            alert('Ingreso guardado');
+            ocultarFormularios();
+        }
+
+        function guardarUsuario() {
+            alert('Usuario guardado');
+            cerrarModal('modal-usuario');
+        }
+
+        function aplicarFiltros() {
+            alert('Filtros aplicados');
+        }
+
+        function descargarExcel() {
+            alert('Descargando Excel...');
+        }
+
+        function descargarReporteExcel() {
+            alert('Descargando Reporte Excel...');
+        }
+
+        function descargarReportePDF() {
+            alert('Descargando Reporte PDF...');
+        }
+
+        function imprimirReporte() {
+            window.print();
+        }
+
+        function abrirModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function cerrarModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // Gráficos Chart.js
+        window.addEventListener('load', function() {
+            // Gráfico 1: Transacciones
+            const ctx1 = document.getElementById('chart-transacciones');
+            if (ctx1) {
+                new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'],
+                        datasets: [
+                            {
+                                label: 'Facturas',
+                                data: [8, 10, 7, 12],
+                                backgroundColor: '#667eea'
+                            },
+                            {
+                                label: 'Ingresos',
+                                data: [5, 6, 8, 7],
+                                backgroundColor: '#f5576c'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Gráfico 2: Reportes
+            const ctx2 = document.getElementById('chart-reportes');
+            if (ctx2) {
+                new Chart(ctx2, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Juan', 'Carlos', 'Pedro'],
+                        datasets: [{
+                            data: [100, 50, 200],
+                            backgroundColor: ['#667eea', '#f5576c', '#4facfe']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right'
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

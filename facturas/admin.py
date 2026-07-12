@@ -8,7 +8,7 @@ from django.db.models.functions import TruncMonth, TruncYear
 from django.utils import timezone
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from .models import Factura, Ingreso, UserRole, ClienteContador
+from .models import Factura, Ingreso, UserRole, ContadorUsuario
 
 
 # ─────────────────────────────────────────────
@@ -383,23 +383,23 @@ class UserRoleAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(ClienteContador)
-class ClienteContadorAdmin(admin.ModelAdmin):
+@admin.register(ContadorUsuario)
+class ContadorUsuarioAdmin(admin.ModelAdmin):
     list_display = [
-        'contador', 'cliente', 'activo',
+        'usuario_normal', 'contador', 'activo',
         'puede_crear_facturas', 'puede_crear_ingresos', 'creado'
     ]
     list_filter = ['activo', 'contador']
     search_fields = [
-        'contador__username', 'cliente__username',
-        'ruc_cliente', 'nombre_razon_social'
+        'usuario_normal__username', 'contador__username',
+        'ruc_usuario', 'nombre_razon_social', 'email'
     ]
     readonly_fields = ['creado', 'actualizado', 'fecha_bloqueo']
 
     fieldsets = (
-        ('Relación', {'fields': ('contador', 'cliente')}),
-        ('Datos del Cliente', {
-            'fields': ('ruc_cliente', 'nombre_razon_social'),
+        ('Relación', {'fields': ('usuario_normal', 'contador')}),
+        ('Datos del Usuario', {
+            'fields': ('ruc_usuario', 'nombre_razon_social', 'direccion', 'telefono', 'email'),
             'classes': ('collapse',)
         }),
         ('Permisos', {

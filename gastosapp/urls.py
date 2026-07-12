@@ -36,6 +36,15 @@ from facturas.views import (
     sheets_desconectar,
     SheetsConfigView,
     SheetsSincronizarView,
+    # Contador
+    ContadorUsuariosListCreateView,
+    ContadorUsuariosDetailView,
+    ContadorUsuariosBloquearView,
+    ContadorFacturasCreateView,
+    ContadorIngresosCreateView,
+    ContadorTransaccionesListView,
+    ContadorDashboardView,
+    contador_dashboard_view,
 )
 
 urlpatterns = [
@@ -79,5 +88,17 @@ urlpatterns = [
     path('sheets/desconectar/',  sheets_desconectar, name='sheets-desconectar'),
     path('api/sheets/config/',   SheetsConfigView.as_view(),       name='sheets-config'),
     path('api/sheets/sincronizar/', SheetsSincronizarView.as_view(), name='sheets-sincronizar'),
+
+    # ── Contador — Frontend ───────────────────────────────
+    path('contador-dashboard/', contador_dashboard_view, name='contador-dashboard'),
+
+    # ── Contador — API ────────────────────────────────────
+    path('api/contador/usuarios/', ContadorUsuariosListCreateView.as_view(), name='contador-usuarios'),
+    path('api/contador/usuarios/<int:pk>/', ContadorUsuariosDetailView.as_view(), name='contador-usuario-detail'),
+    path('api/contador/usuarios/<int:pk>/bloquear/', ContadorUsuariosBloquearView.as_view(), name='contador-usuario-bloquear'),
+    path('api/contador/facturas/', ContadorFacturasCreateView.as_view(), name='contador-facturas'),
+    path('api/contador/ingresos/', ContadorIngresosCreateView.as_view(), name='contador-ingresos'),
+    path('api/contador/transacciones/', ContadorTransaccionesListView.as_view(), name='contador-transacciones'),
+    path('api/contador/dashboard/', ContadorDashboardView.as_view(), name='contador-dashboard-api'),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

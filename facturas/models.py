@@ -218,36 +218,35 @@ class UserRole(models.Model):
         return f"{self.user.username} — {self.get_role_display()}"
 
 
-class ClienteContador(models.Model):
+class ContadorUsuario(models.Model):
     """
-    Relación jerárquica Contador → Cliente.
-    Un contador puede tener múltiples clientes y viceversa.
+    Un usuario normal tiene UN contador asociado.
+    Un contador puede gestionar múltiples usuarios normales (relación 1:N).
     """
 
+    usuario_normal = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='mi_contador_asoc',
+        help_text='Usuario normal que tiene este contador'
+    )
     contador = models.ForeignKey(
         User,
-        on_delete=models.CASCADE,
-        related_name='mis_clientes_vinculados'
-    )
-    cliente = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='mis_contadores_vinculados'
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='mis_usuarios_normales',
+        help_text='Contador responsable de este usuario'
     )
 
-    # Datos del cliente para auditoría
-    ruc_cliente = models.CharField(
-        max_length=20,
-        blank=True,
-        help_text='RUC o ID fiscal del cliente'
-    )
-    nombre_razon_social = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text='Razón social registrada'
-    )
+    # Datos de identificación para auditoría
+    ruc_usuario = models.CharField(max_length=20, blank=True)
+    nombre_razon_social = models.CharField(max_length=255, blank=True)
+    direccion = models.CharField(max_length=255, blank=True)
+    telefono = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
 
-    # Permisos granulares
+    # Permisos del contador sobre este usuario
     puede_crear_facturas = models.BooleanField(default=True)
     puede_crear_ingresos = models.BooleanField(default=True)
     puede_editar_transacciones = models.BooleanField(default=True)
@@ -256,32 +255,19 @@ class ClienteContador(models.Model):
     # Estado y control
     activo = models.BooleanField(
         default=True,
-        help_text='Desactiva para bloquear cliente sin eliminar'
+        help_text='Desactiva para bloquear usuario sin eliminar'
     )
-    fecha_bloqueo = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text='Timestamp del bloqueo'
-    )
-    razon_bloqueo = models.TextField(
-        blank=True,
-        help_text='Razón por la que fue bloqueado'
-    )
+    fecha_bloqueo = models.DateTimeField(null=True, blank=True)
+    razon_bloqueo = models.TextField(blank=True)
 
     creado = models.DateTimeField(auto_now_add=True)
     actualizado = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Cliente de Contador'
-        verbose_name_plural = 'Clientes de Contador'
-        unique_together = ('contador', 'cliente')
+        verbose_name = 'Contador Usuario'
+        verbose_name_plural = 'Contadores Usuario'
         ordering = ['-creado']
-        constraints = [
-            models.CheckConstraint(
-                check=~models.Q(contador=models.F('cliente')),
-                name='contador_cliente_diferentes'
-            )
-        ]
 
     def __str__(self):
-        return f"{self.contador.username} → {self.cliente.username}"
+        contador_str = self.contador.username if self.contador else 'Sin contador'
+        return f"{self.usuario_normal.username} → {contador_str}"
