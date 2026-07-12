@@ -74,6 +74,16 @@ class Factura(models.Model):
     )
     notas = models.TextField(blank=True)
 
+    # Contador que registró esta factura en nombre del usuario
+    registrado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='facturas_registradas',
+        help_text='Contador que registró esta factura'
+    )
+
     # Fechas automáticas (ya existían)
     creado = models.DateTimeField(auto_now_add=True)
     actualizado = models.DateTimeField(auto_now=True)
@@ -125,6 +135,16 @@ class Ingreso(models.Model):
     fecha = models.DateField()
     notas = models.TextField(blank=True)
 
+    # Contador que registró este ingreso en nombre del usuario
+    registrado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ingresos_registrados',
+        help_text='Contador que registró este ingreso'
+    )
+
     # Fechas automáticas
     creado = models.DateTimeField(auto_now_add=True)
     actualizado = models.DateTimeField(auto_now=True)
@@ -162,3 +182,106 @@ class GoogleSheetConfig(models.Model):
     @property
     def conectado(self):
         return bool(self.refresh_token)
+
+
+class UserRole(models.Model):
+    """Rol de usuario: normal o contador."""
+
+    ROLE_CHOICES = [
+        ('usuario_normal', 'Usuario Normal'),
+        ('contador', 'Contador'),
+    ]
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='rol'
+    )
+    role = models.CharField(
+        max_length=50,
+        choices=ROLE_CHOICES,
+        default='usuario_normal'
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text='Desactiva para bloquear el usuario'
+    )
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Rol de Usuario'
+        verbose_name_plural = 'Roles de Usuario'
+        ordering = ['user__username']
+
+    def __str__(self):
+        return f"{self.user.username} — {self.get_role_display()}"
+
+
+class ClienteContador(models.Model):
+    """
+    Relación jerárquica Contador → Cliente.
+    Un contador puede tener múltiples clientes y viceversa.
+    """
+
+    contador = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='mis_clientes_vinculados'
+    )
+    cliente = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='mis_contadores_vinculados'
+    )
+
+    # Datos del cliente para auditoría
+    ruc_cliente = models.CharField(
+        max_length=20,
+        blank=True,
+        help_text='RUC o ID fiscal del cliente'
+    )
+    nombre_razon_social = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Razón social registrada'
+    )
+
+    # Permisos granulares
+    puede_crear_facturas = models.BooleanField(default=True)
+    puede_crear_ingresos = models.BooleanField(default=True)
+    puede_editar_transacciones = models.BooleanField(default=True)
+    puede_ver_reportes = models.BooleanField(default=True)
+
+    # Estado y control
+    activo = models.BooleanField(
+        default=True,
+        help_text='Desactiva para bloquear cliente sin eliminar'
+    )
+    fecha_bloqueo = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp del bloqueo'
+    )
+    razon_bloqueo = models.TextField(
+        blank=True,
+        help_text='Razón por la que fue bloqueado'
+    )
+
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Cliente de Contador'
+        verbose_name_plural = 'Clientes de Contador'
+        unique_together = ('contador', 'cliente')
+        ordering = ['-creado']
+        constraints = [
+            models.CheckConstraint(
+                check=~models.Q(contador=models.F('cliente')),
+                name='contador_cliente_diferentes'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.contador.username} → {self.cliente.username}"

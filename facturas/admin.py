@@ -8,7 +8,7 @@ from django.db.models.functions import TruncMonth, TruncYear
 from django.utils import timezone
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from .models import Factura
+from .models import Factura, Ingreso, UserRole, ClienteContador
 
 
 # ─────────────────────────────────────────────
@@ -110,6 +110,7 @@ class FacturaAdmin(admin.ModelAdmin):
 
     list_display = [
         'get_usuario',
+        'get_registrado_por',
         'nombre_proveedor',
         'timbrado',
         'ruc',
@@ -125,7 +126,7 @@ class FacturaAdmin(admin.ModelAdmin):
     readonly_fields = ['texto_ocr', 'creado', 'actualizado']
 
     fieldsets = (
-        ('Usuario', {'fields': ('usuario',)}),
+        ('Usuario', {'fields': ('usuario', 'registrado_por')}),
         ('Imagen', {'fields': ('imagen',)}),
         ('Tipo de Factura', {'fields': ('tipo',)}),
         ('Datos de la Factura', {
@@ -138,13 +139,19 @@ class FacturaAdmin(admin.ModelAdmin):
         }),
     )
 
-    # Columna usuario con link
     def get_usuario(self, obj):
         if obj.usuario:
             return obj.usuario.get_full_name() or obj.usuario.username
         return "—"
     get_usuario.short_description = "Usuario"
     get_usuario.admin_order_field = "usuario__username"
+
+    def get_registrado_por(self, obj):
+        if obj.registrado_por:
+            return obj.registrado_por.get_full_name() or obj.registrado_por.username
+        return "—"
+    get_registrado_por.short_description = "Registrado por"
+    get_registrado_por.admin_order_field = "registrado_por__username"
 
     # ── URLs personalizadas ──
     def get_urls(self):
@@ -331,3 +338,79 @@ class FacturaAdmin(admin.ModelAdmin):
         extra_context = extra_context or {}
         extra_context['dashboard_url'] = '/admin/facturas/factura/dashboard/'
         return super().changelist_view(request, extra_context=extra_context)
+
+
+@admin.register(Ingreso)
+class IngresoAdmin(admin.ModelAdmin):
+    list_display = ['usuario', 'get_registrado_por', 'descripcion', 'monto', 'categoria', 'fecha', 'creado']
+    list_filter = ['categoria', 'fecha', 'usuario']
+    search_fields = ['descripcion', 'notas', 'usuario__username']
+    readonly_fields = ['creado', 'actualizado']
+
+    fieldsets = (
+        ('Usuario', {'fields': ('usuario', 'registrado_por')}),
+        ('Datos del Ingreso', {
+            'fields': ('descripcion', 'monto', 'categoria', 'fecha', 'notas')
+        }),
+        ('Fechas del Sistema', {
+            'fields': ('creado', 'actualizado'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_registrado_por(self, obj):
+        if obj.registrado_por:
+            return obj.registrado_por.get_full_name() or obj.registrado_por.username
+        return "—"
+    get_registrado_por.short_description = "Registrado por"
+    get_registrado_por.admin_order_field = "registrado_por__username"
+
+
+@admin.register(UserRole)
+class UserRoleAdmin(admin.ModelAdmin):
+    list_display = ['user', 'role', 'activo', 'creado']
+    list_filter = ['role', 'activo']
+    search_fields = ['user__username', 'user__email']
+    readonly_fields = ['creado', 'actualizado']
+
+    fieldsets = (
+        ('Usuario', {'fields': ('user',)}),
+        ('Rol y Estado', {'fields': ('role', 'activo')}),
+        ('Auditoría', {
+            'fields': ('creado', 'actualizado'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(ClienteContador)
+class ClienteContadorAdmin(admin.ModelAdmin):
+    list_display = [
+        'contador', 'cliente', 'activo',
+        'puede_crear_facturas', 'puede_crear_ingresos', 'creado'
+    ]
+    list_filter = ['activo', 'contador']
+    search_fields = [
+        'contador__username', 'cliente__username',
+        'ruc_cliente', 'nombre_razon_social'
+    ]
+    readonly_fields = ['creado', 'actualizado', 'fecha_bloqueo']
+
+    fieldsets = (
+        ('Relación', {'fields': ('contador', 'cliente')}),
+        ('Datos del Cliente', {
+            'fields': ('ruc_cliente', 'nombre_razon_social'),
+            'classes': ('collapse',)
+        }),
+        ('Permisos', {
+            'fields': (
+                'puede_crear_facturas', 'puede_crear_ingresos',
+                'puede_editar_transacciones', 'puede_ver_reportes'
+            )
+        }),
+        ('Control', {'fields': ('activo', 'razon_bloqueo', 'fecha_bloqueo')}),
+        ('Auditoría', {
+            'fields': ('creado', 'actualizado'),
+            'classes': ('collapse',)
+        }),
+    )
