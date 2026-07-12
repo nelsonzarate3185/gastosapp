@@ -1,7 +1,13 @@
 venv/
 .env
+.venv
 __pycache__/
 *.pyc
 db.sqlite3
 media/
 staticfiles/
+
+# Archivos de diseño/prompts locales
+*.zip
+files_extracted/
+file_2_extracted/
